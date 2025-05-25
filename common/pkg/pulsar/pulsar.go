@@ -20,16 +20,33 @@ func (pc PulsarConfig) BuildClient() (pulsar.Client, error) {
 		addr = append(addr, "pulsar://"+v)
 	}
 	url := strings.Join(addr, ",")
-	client, err := pulsar.NewClient(pulsar.ClientOptions{
-		URL:               url,
-		OperationTimeout:  30 * time.Second,
-		ConnectionTimeout: 30 * time.Second,
-		Logger:            pulsarLog.NewLoggerWithLogrus(logger),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
+
+	logger.Infof("connect to pulsar %s", url)
+	// 增加pulsar连接重试机制
+    var pulsarClient pulsar.Client
+    for i := 0; i < 5; i++ {
+		client, err := pulsar.NewClient(pulsar.ClientOptions{
+			URL:               url,
+			OperationTimeout:  30 * time.Second,
+			ConnectionTimeout: 30 * time.Second,
+			Logger:            pulsarLog.NewLoggerWithLogrus(logger),
+		})
+		// if err != nil {
+		// 	return nil, err
+		// }
+
+        if err == nil {
+            pulsarClient = client
+            break
+        }
+        time.Sleep(2 * time.Second)
+    }
+    if pulsarClient == nil {
+		logger.Panicf("init pulsar consumer failed after retries %s", url)
+    }
+
+
+	return pulsarClient, nil
 }
 
 type Topic struct {

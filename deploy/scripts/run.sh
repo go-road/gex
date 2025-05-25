@@ -49,7 +49,7 @@ quotecoinid: 10002
 baseCoinPrec: 3
 quoteCoinPrec: 5'
 
-docker-compose -f deploy/depend/docker-compose.yaml up -d
+docker compose -f deploy/depend/docker-compose.yaml up -d
 
 sleep 30s
 
@@ -58,12 +58,38 @@ docker exec -it etcd /usr/local/bin/etcdctl put Coin/IKUN -- "$coin1"
 docker exec -it etcd /usr/local/bin/etcdctl put Coin/USDT -- "$coin2"
 docker exec -it etcd /usr/local/bin/etcdctl put Symbol/IKUN_USDT -- "$symbol"
 
+# The key is to ensure Pulsar is fully initialized before attempting to create topics. The health check and wait script will prevent these errors from occurring during startup.
+# Wait for Pulsar to be ready
+while ! curl -s http://localhost:8080/admin/v2/brokers/health > /dev/null; do
+  echo "Waiting for Pulsar to start..."
+  sleep 5
+done
 
-docker exec -it pulsar /pulsar/bin/pulsar-admin namespaces create public/trade
-docker exec -it pulsar /pulsar/bin/pulsar-admin topics create persistent://public/trade/match_source_IKUN_USDT
-docker exec -it pulsar /pulsar/bin/pulsar-admin topics create persistent://public/trade/match_result_IKUN_USDT
+# Then create topics
+docker exec -it pulsar /pulsar/bin/pulsar-admin namespaces create public/trade || true
+# docker exec -it pulsar /pulsar/bin/pulsar-admin topics create persistent://public/trade/match_source_IKUN_USDT
+# docker exec -it pulsar /pulsar/bin/pulsar-admin topics create persistent://public/trade/match_result_IKUN_USDT
 
-docker-compose -f deploy/dockerfiles/docker-compose.yaml up -d
+# 主题创建部分为带重试机制
+max_retries=5
+retry_count=0
+
+until docker exec pulsar /pulsar/bin/pulsar-admin topics create persistent://public/trade/match_source_IKUN_USDT || [ $retry_count -eq $max_retries ]; do
+  echo "创建match_source_IKUN_USDT主题失败，正在重试... ($((retry_count+1))/$max_retries)"
+  sleep 10
+  ((retry_count++))
+done
+
+retry_count=0
+until docker exec pulsar /pulsar/bin/pulsar-admin topics create persistent://public/trade/match_result_IKUN_USDT || [ $retry_count -eq $max_retries ]; do
+  echo "创建match_result_IKUN_USDT主题失败，正在重试... ($((retry_count+1))/$max_retries)"
+  sleep 10
+  ((retry_count++))
+done
+
+
+
+docker compose -f deploy/dockerfiles/docker-compose.yaml up -d
 
 
 

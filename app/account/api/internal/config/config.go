@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	Env string
 	rest.RestConf
 	LoggerConfig     logger.Config
 	AccountRpcConf   zrpc.RpcClientConf

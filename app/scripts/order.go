@@ -73,7 +73,7 @@ func main() {
 						"order_type":  2,
 					}).
 					SetResult(&result).
-					Post("http://47.113.223.16/order/v1/create_order")
+					Post("http://api.gex.com/order/v1/create_order")
 				if err != nil {
 					log.Printf("下单失败 %v", err)
 				}
@@ -119,12 +119,13 @@ func login() {
 	var result = map[string]interface{}{}
 	_, err := cli.R().
 		SetHeader("Content-Type", "application/json").
-		SetBody(`{"username":"lisi", "password":"lisilisi"}`).
+		SetBody(`{"username":"lisi", "password":"lisilisi", "captcha":"", "captcha_id":"1"}`).
 		SetResult(&result).
 		Post("http://api.gex.com/account/v1/login")
 	if err != nil {
 		log.Panicf("err %v", err)
 	}
+	log.Printf("result %v", result)
 	code, ok := result["code"]
 	if !ok {
 		log.Printf("data=%v", result)
@@ -134,6 +135,7 @@ func login() {
 	}
 	data := result["data"].(map[string]interface{})
 	token = cast.ToString(data["token"])
+	log.Println("登录成功", token)
 }
 
 type PriceData struct {

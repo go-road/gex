@@ -27,7 +27,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	sc := &ServiceContext{
 		Config:           c,
 		Auth:             middleware.NewAuthMiddleware(accountservice.NewAccountService(zrpc.MustNewClient(c.AccountRpcConf))).Handle,
-		AccountRpcClient: accountservice.NewAccountService(zrpc.MustNewClient(c.AccountRpcConf)),
+		AccountRpcClient: accountservice.NewAccountService(zrpc.MustNewClient(c.AccountRpcConf)), // 通过etcd发现服务
 		CaptchaStore:     base64Captcha.NewMemoryStore(10000, time.Minute*3),
 	}
 	errs.InitTranslatorFromEtcd(c.LanguageEtcdConf)

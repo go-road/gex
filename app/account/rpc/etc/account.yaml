@@ -6,6 +6,18 @@ Etcd:
     - etcd:2379
   Key: accountRpc
 
+# zrpc.RpcServerConf 结构体内嵌了 go-zero 的 RPC 服务配置标准结构
+# go-zero 框架会自动合并配置文件中的顶级配置项到内嵌结构体
+# 当同时存在 Etcd 和 RpcServerConf.Etcd 时，后者会覆盖前者
+# 因此，这里只需要配置 Etcd 即可
+# RpcServerConf:
+#   Etcd:
+#     Hosts:
+#       - etcd:2379
+#     Key: accountRpc
+#   ListenOn: 0.0.0.0:20002
+#   Timeout: 1000000
+  
 SymbolEtcdConfig:
   Endpoints:
     - etcd:2379

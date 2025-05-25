@@ -6,3 +6,5 @@ deploy/depend/nginx/log
 deploy/depend/pulsar/data
 deploy/depend/redis/data
 **/bin
+deploy/depend/nginx/html/dist
+deploy/depend/pulsar_manager/lib/pulsar-manager.jar

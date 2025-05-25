@@ -1,7 +1,7 @@
 
 genaccount:
 #gormt 通过数据库生成指定的结构体 https://github.com/xxjwxc/gormt -z config.yaml 指定配置文件路径
-	gentool --dsn="root:root@tcp(192.168.2.159:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=user,asset  -outPath=app/account/rpc/internal/dao/query -fieldMap="decimal:string;tinyint:int32;"
+	gentool --dsn="root:root@tcp(192.168.1.4:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=user,asset  -outPath=app/account/rpc/internal/dao/query -fieldMap="decimal:string;tinyint:int32;"
 accountapi:
 	   goctl api go -api=app/account/api/desc/account.api -dir=app/account/api -style=go_zero  -home=template && make accountdoc
 accountdoc:
@@ -15,7 +15,7 @@ orderapi:
 orderdoc:
 	   goctl api plugin -plugin goctl-swagger="swagger -filename doc/order.json -host api.gex.com" -api app/order/api/desc/order.api -dir .
 genorder:
-	gentool --dsn="root:root@tcp(192.168.2.159:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=entrust_order_00,matched_order  -outPath=app/order/rpc/internal/dao/query -fieldMap="decimal:string;tinyint:int32;bigint:int64;"
+	gentool --dsn="root:root@tcp(192.168.1.4:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=entrust_order_00,matched_order  -outPath=app/order/rpc/internal/dao/query -fieldMap="decimal:string;tinyint:int32;bigint:int64;"
 enum:
 	protoc   -I. --go_out=./  common/proto/enum/*.proto
 matchmq:
@@ -25,7 +25,7 @@ matchrpc:
 	goctl rpc  protoc -I./ -Icommon/proto app/match/rpc/pb/match.proto --go_out=app/match/rpc --go-grpc_out=app/match/rpc   --zrpc_out=app/match/rpc -style=go_zero  -home=template
 	make matchmodel
 matchmodel:
-	gentool --dsn="root:root@tcp(192.168.2.159:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=matched_order  -outPath=app/match/rpc/internal/dao/query -fieldMap="decimal:string;tinyint:int32;int:int64"
+	gentool --dsn="root:root@tcp(192.168.1.4:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=matched_order  -outPath=app/match/rpc/internal/dao/query -fieldMap="decimal:string;tinyint:int32;int:int64"
 klinerpc:
 	goctl rpc  protoc -I./ app/quotes/kline/rpc/pb/kline.proto --go_out=app/quotes/kline/rpc --go-grpc_out=app/quotes/kline/rpc  --zrpc_out=app/quotes/kline/rpc -style=go_zero  -home=template
 tickerrpc:
@@ -34,7 +34,7 @@ depthrpc:
 	goctl rpc  protoc -I./ app/quotes/depth/rpc/pb/depth.proto --go_out=app/quotes/depth/rpc --go-grpc_out=app/quotes/depth/rpc  --zrpc_out=app/quotes/depth/rpc -style=go_zero  -home=template
 
 klinemodel:
-	gentool --dsn="root:root@tcp(192.168.2.159:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=kline  -outPath=app/quotes/kline/rpc/internal/dao/query -fieldMap="decimal:string;tinyint:int32;int:int64"
+	gentool --dsn="root:root@tcp(192.168.1.4:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=kline  -outPath=app/quotes/kline/rpc/internal/dao/query -fieldMap="decimal:string;tinyint:int32;int:int64"
 quoteapi:
 	   goctl api go -api=app/quotes/api/desc/quotes.api -dir=app/quotes/api -style=go_zero  -home=template && make quotedoc
 quotedoc:
@@ -47,9 +47,9 @@ admindoc:
 	goctl api plugin -plugin goctl-swagger="swagger -filename doc/admin.json -host api.gex.com" -api app/admin/api/desc/admin.api -dir .
 
 adminmodel:
-	gentool --dsn="root:root@tcp(192.168.2.159:3307)/admin?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql  -outPath=app/admin/api/internal/dao/admin/query -fieldMap="decimal:string;tinyint:int32;int:int32" -fieldSignable=true
+	gentool --dsn="root:root@tcp(192.168.1.4:3307)/admin?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql  -outPath=app/admin/api/internal/dao/admin/query -fieldMap="decimal:string;tinyint:int32;int:int32" -fieldSignable=true
 	softdeleted -p app/admin/api/internal/dao/model/*.go
-	gentool --dsn="root:root@tcp(192.168.2.159:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=matched_order  -outPath=app/admin/api/internal/dao/match/query -fieldMap="decimal:string;tinyint:int32;int:int64"
+	gentool --dsn="root:root@tcp(192.168.1.4:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=matched_order  -outPath=app/admin/api/internal/dao/match/query -fieldMap="decimal:string;tinyint:int32;int:int64"
 
 kline:
 	make klinerpc  && make klinemodel
@@ -58,6 +58,11 @@ run:
 	make pre
 	chmod +x ./deploy/scripts/run.sh
 	./deploy/scripts/run.sh
+
+stop:
+	docker compose -f deploy/dockerfiles/docker-compose.yaml down
+	docker compose -f deploy/depend/docker-compose.yaml down	
+	
 clear:
 	chmod +x ./deploy/scripts/remove_containers.sh
 	chmod +x ./deploy/scripts/remove_images.sh
@@ -80,9 +85,9 @@ pre:
 	chmod +x ./deploy/depend/ws/socket/socket
 
 dep1:
-	docker-compose -f deploy/depend/docker-compose.yaml up
+	docker compose -f deploy/depend/docker-compose.yaml up
 dep2:
-	docker-compose -f deploy/dockerfiles/docker-compose.yaml up
+	docker compose -f deploy/dockerfiles/docker-compose.yaml up
 
 build:
 	go env -w GOOS=linux
@@ -97,3 +102,10 @@ build:
 	go build -ldflags="-s -w" -o ./bin/orderrpc ./app/order/rpc/order.go
 	go build -ldflags="-s -w" -o ./bin/quoteapi ./app/quotes/api/quote.go
 	go build -ldflags="-s -w" -o ./bin/klinerpc ./app/quotes/kline/rpc/kline.go
+
+rebuild-accountrpc: 
+	# docker stop accountrpc && docker rm accountrpc
+	go build -ldflags="-s -w" -o ./bin/accountrpc ./app/account/rpc/account.go
+	docker compose -f deploy/dockerfiles/docker-compose.yaml build accountrpc
+	docker compose -f deploy/dockerfiles/docker-compose.yaml up -d --force-recreate accountrpc
+	docker logs -f accountrpc
