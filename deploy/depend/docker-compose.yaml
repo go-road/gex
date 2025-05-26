@@ -157,21 +157,27 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:1.53
     container_name: jaeger
+    command:
+      - --collector.otlp.grpc.max-connection-age=30s  # 启用连接生命周期管理
+      - --collector.otlp.grpc.max-connection-age-grace=5s
     environment:
       # - SPAN_STORAGE_TYPE=elasticsearch
       - SPAN_STORAGE_TYPE=memory  
+      - REPORTER_GRPC_HOST_PORT=jaeger:4317  # 显式指定服务发现地址
       - COLLECTOR_OTLP_ENABLED=true          # OTLP接收器
       - COLLECTOR_OTLP_GRPC_ENABLED=true     # GRPC接收器
-      - COLLECTOR_OTLP_GRPC_HOST_PORT=:4317  # 指定 gRPC 端口
-      - COLLECTOR_ZIPKIN_HOST_PORT=:9411     # 启用 Zipkin 兼容端口
+      - COLLECTOR_OTLP_GRPC_HOST_PORT=0.0.0.0:4317  # 指定 gRPC 端口
       - COLLECTOR_OTLP_HTTP_ENABLED=true     # HTTP接收器
-      - COLLECTOR_OTLP_HTTP_HOST_PORT=:4318  # 指定 HTTP 端口
+      - COLLECTOR_OTLP_HTTP_HOST_PORT=0.0.0.0:4318  # 指定 HTTP 端口
+      - COLLECTOR_GRPC_SERVER_ENABLE_REFLECTION=true # 启用gRPC反射
+      # - COLLECTOR_ZIPKIN_HOST_PORT=:9411     # 启用 Zipkin 兼容端口
       # - COLLECTOR_OTLP_HTTP_ENDPOINT=0.0.0.0:4318
       # - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       # - REPORTER_GRPC_HOST_PORT=jaeger:4317  # 显式指定agent上报地址
     ports:
       - "16686:16686"    # UI端口
       - "4317:4317"      # OTLP gRPC 端口
+      - "16685:16685"    # 暴露内部Query的gRPC端口（可选）
       - "4318:4318"      # OTLP HTTP 端口
       - "9411:9411"      # Zipkin 端口
       # - "6831:6831/udp"  # Agent UDP端口      

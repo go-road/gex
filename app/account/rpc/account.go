@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/trace"
 
 	// "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -33,6 +35,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -47,22 +50,43 @@ func init() {
 }
 
 // 初始化追踪器
-func initTracer() (*sdktrace.TracerProvider, error) {
-	logx.Info("正在初始化Jaeger连接...")
+func initTracer(c config.Config) (*sdktrace.TracerProvider, error) {
+	if os.Getenv("OTEL_LOG_LEVEL") == "debug" {
+    	logx.Info("OpenTelemetry 调试模式已启用")
+	}
+	fmt.Println("=== 这是直接控制台输出测试 ===")
+	// 优先使用环境变量
+    endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if endpoint == "" {
+        endpoint = c.OTLP.Endpoint
+    }
+	if endpoint == "" {
+		endpoint = "jaeger:4317" 
+        // return nil, fmt.Errorf("OTLP endpoint未配置，请检查环境变量OTEL_EXPORTER_OTLP_ENDPOINT或配置文件中的otlp.endpoint")
+    }
+    logx.Infof("正在连接Jaeger端点: %s", endpoint) 
     
-    // 创建带超时的context
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
+    // 创建带超时的context 使用独立上下文用于连接检查
+    connCtx, connCancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer connCancel()
 
     // 添加预连接检查
-    conn, err := grpc.DialContext(ctx, "jaeger:4317", 
+    conn, err := grpc.DialContext(connCtx, endpoint, 
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(), // 阻塞直到连接成功
+		grpc.WithReturnConnectionError(), // 获取详细错误
 	)
     if err != nil {
         return nil, fmt.Errorf("无法连接Jaeger: %v", err)
     }
-    defer conn.Close()
+    defer func() {
+		if err := conn.Close(); err != nil {
+			logx.Error("关闭预连接失败", logx.Field("error", err))
+		}
+	}()
+	state := conn.GetState()
+	logx.Infof("Jaeger实际连接地址: %s", conn.Target())
+	logx.Infof("Jaeger连接状态: %s", state.String())
 	logx.Info("Jaeger连接成功,正在创建导出器...")
 
 	// 创建OTLP HTTP exporter
@@ -77,16 +101,27 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 	// )
 
 	// 创建OTLP gRPC exporter
-	exporter, err := otlptracegrpc.New(ctx,
-        otlptracegrpc.WithEndpoint("jaeger:4317"),
-        otlptracegrpc.WithInsecure(),
-		otlptracegrpc.WithTimeout(5*time.Second),
+	// 构建配置选项
+    var opts []otlptracegrpc.Option
+    opts = append(opts, otlptracegrpc.WithEndpoint(endpoint))
+    if c.OTLP.Insecure {
+        opts = append(opts, otlptracegrpc.WithInsecure())
+    }
+	if c.OTLP.Timeout > 0 {
+		opts = append(opts, otlptracegrpc.WithTimeout(time.Duration(c.OTLP.Timeout)*time.Second))
+	}
+	opts = append(opts, 
 		otlptracegrpc.WithRetry(otlptracegrpc.RetryConfig{
 			Enabled:         true,
 			InitialInterval: 1 * time.Second,
 			MaxInterval:     5 * time.Second,
 			MaxElapsedTime:  30 * time.Second,
-		}),
+		}))
+	// 创建导出器时同时考虑代码配置和环境变量配置
+	logx.Debugf("导出器上下文ID: %p", context.Background())		
+	exporter, err := otlptracegrpc.New(
+		context.Background(), // 应用生命周期级别的上下文
+		opts...,
     )
 	if err != nil {
 		// logx.Error("创建导出器失败", logx.Field("error", err))
@@ -106,13 +141,15 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
-			// semconv.ServiceName("account.rpc"),
-			semconv.ServiceNameKey.String("account.rpc"), // 强制指定服务名
+			semconv.ServiceName("account-rpc-service"),
 			semconv.ServiceVersion("v1.0.0"),
-			// semconv.DeploymentEnvironment("prod"),
-			attribute.String("environment", "prod"),
+			semconv.DeploymentEnvironment("prod"),
 			attribute.String("host.name", "account-rpc"),
+			attribute.String("service.instance.id", os.Getenv("HOSTNAME")), // 添加实例标识
+    		attribute.String("exporter", "jaeger"),     
+			// semconv.ServiceNameKey.String("account.rpc"), // 强制指定服务名
             // attribute.String("service.version", "v1.2.3"),
+			// attribute.String("environment", "prod"),
 		),
 	)
 	if err != nil {
@@ -125,8 +162,36 @@ func initTracer() (*sdktrace.TracerProvider, error) {
     // )
 	sampler := sdktrace.AlwaysSample() //全部采样
 
+	// 使用官方BatchSpanProcessor 官方处理器会自动处理以下内容：
+	// 1.批量收集Span数据
+	// 2.自动重试机制
+	// 3.内存队列管理
+	// 4.异步导出优化
+    batchProcessor := sdktrace.NewBatchSpanProcessor(exporter, 
+        sdktrace.WithBatchTimeout(5*time.Second),
+        sdktrace.WithMaxExportBatchSize(512),
+        sdktrace.WithMaxQueueSize(2048),
+        sdktrace.WithExportTimeout(10*time.Second),
+    )
+	logx.Info("BatchSpanProcessor创建成功", logx.Field("batchProcessor", batchProcessor))
+
+	// 日志导出器（仅用于调试）
+	debugExporter, err := stdouttrace.New(
+		stdouttrace.WithPrettyPrint(),
+		stdouttrace.WithWriter(os.Stdout), // 直接输出到标准输出
+		stdouttrace.WithWriter(&logWriter{logger: logx.Info}),  // 同时记录到日志系统
+	)
+	if err != nil {
+    	logx.Error("创建stdout导出器失败", logx.Field("error", err))
+	}
+	logx.Info("创建stdout导出器成功", logx.Field("debugExporter", debugExporter))
+
 	logx.Info("资源信息配置成功,正在创建TracerProvider...")
 	// 创建TracerProvider
+	// 1.双重输出机制：批处理器每5秒批量发送到Jaeger，简单处理器实时打印到控制台
+	// 2.调试生产两不误：开发时可查看实时日志，生产环境保持批量发送的高效性
+	// 3.独立工作互不干扰：两个处理器分别处理Span数据，不会互相阻塞
+	// 4.生产环境建议移除SimpleSpanProcessor，避免性能损耗
 	tp := sdktrace.NewTracerProvider(
 		// sdktrace.WithBatcher(exporter, 
         //     sdktrace.WithBatchTimeout(5*time.Second),
@@ -134,20 +199,24 @@ func initTracer() (*sdktrace.TracerProvider, error) {
         //     sdktrace.WithMaxQueueSize(2048),
         //     sdktrace.WithExportTimeout(10*time.Second),
         // ),
-		sdktrace.WithSyncer(exporter), // 同步导出
+		// sdktrace.WithSyncer(exporter), // 同步导出
+		sdktrace.WithSpanProcessor(batchProcessor), // 批量处理器（用于生产环境）
+		// sdktrace.WithSpanProcessor(sdktrace.NewSimpleSpanProcessor(debugExporter)), // 即时输出处理器（用于调试）
 		sdktrace.WithResource(res),
 		sdktrace.WithSampler(sampler),
 	)	
 	logx.Info("TracerProvider创建成功")
+
 	// 注册自定义处理器用于调试
-	logx.Info("注册自定义span处理器")
+	// logx.Info("注册自定义span处理器")
 	// tp.RegisterSpanProcessor(&logSpanProcessor{})
 	// tp.RegisterSpanProcessor(NewLogSpanProcessor())
-	processor := NewLogSpanProcessor()
-	if processor == nil {
-		return tp, fmt.Errorf("failed to create span processor")
-	}
-	tp.RegisterSpanProcessor(processor)
+	// processor := NewLogSpanProcessor()
+	// if processor == nil {
+	// 	return tp, fmt.Errorf("failed to create span processor")
+	// }
+	// tp.RegisterSpanProcessor(processor)
+
 	// 设置全局TracerProvider
 	otel.SetTracerProvider(tp)
 
@@ -168,21 +237,37 @@ func main() {
 	ctx := svc.NewServiceContext(c)
 	consumer.InitConsumer(ctx)
 
+	// 打印完整配置树
+    logx.Infof("完整配置结构: %+v", c) 
+    // 专门打印OTLP配置
+    logx.Infow("OTLP配置详情",
+        logx.Field("endpoint", c.OTLP.Endpoint),
+        logx.Field("insecure", c.OTLP.Insecure),
+        logx.Field("timeout", c.OTLP.Timeout),
+        logx.Field("export_type", c.OTLP.ExportType),
+    )
 	// 添加注册验证日志
 	logx.Infof("ETCD registration config: %+v", c.RpcServerConf.Etcd)
     logx.Infof("RpcServerConf.Etcd.Hosts = %v", c.RpcServerConf.Etcd.Hosts)
     logx.Infof("RpcServerConf.Etcd.Key = %s", c.RpcServerConf.Etcd.Key)
+	logx.Infof("当前OTLP配置: %+v", c.OTLP)
+    logx.Infof("环境变量OTEL_EXPORTER_OTLP_ENDPOINT: %s", os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
 
 	// 初始化追踪器
-	tp, err := initTracer()
+	tp, err := initTracer(c)
 	if err != nil {
 		logx.Error("初始化追踪器失败", logx.Field("error", err))
 		return
 	}
 	logx.Info("OpenTelemetry追踪器已初始化", 
-    logx.Field("service", "account.rpc"),
+    logx.Field("service", "account-rpc-service"),
     logx.Field("endpoint", "jaeger:4318"))
-	defer tp.Shutdown(context.Background())
+	// defer tp.Shutdown(context.Background())
+	defer func() {
+        if err := tp.Shutdown(context.Background()); err != nil {
+            logx.Error("关闭追踪器失败", logx.Field("error", err))
+        }
+    }()
 
 	// 自动注册到etcd
 	// 框架会自动执行以下操作：
@@ -194,14 +279,17 @@ func main() {
 		logx.Infof("RpcServerConf: %+v", c.RpcServerConf)
         // 添加OpenTelemetry配置
 		// 使用新版统计处理器（替换旧拦截器）
-        grpc.StatsHandler(otelgrpc.NewServerHandler())  
+        grpc.StatsHandler(otelgrpc.NewServerHandler(
+			otelgrpc.WithTracerProvider(tp), // 使用自定义的TracerProvider
+			otelgrpc.WithPropagators(otel.GetTextMapPropagator()), // 使用全局传播器
+		))  
         // grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor())
 
 		// 注册protobuf定义的gRPC服务实现
 		pb.RegisterAccountServiceServer(grpcServer, server.NewAccountServiceServer(ctx))
 		logx.Infof("c.Mode is %+v , service.DevMode is %+v, service.TestMode is %+v", c.Mode, service.DevMode, service.TestMode)
-		// 开发/测试模式启用gRPC反射服务（用于grpcurl调试）
-		if c.Mode == service.DevMode || c.Mode == service.TestMode {
+		// 开发/测试/生产模式启用gRPC反射服务（用于grpcurl调试）
+		if c.Mode == service.DevMode || c.Mode == service.TestMode  || c.Mode == service.ProMode {
 			reflection.Register(grpcServer)
 			logx.Infof("grpcServer registered successfully")
 		}
@@ -219,8 +307,13 @@ func main() {
 		// 添加注册回调日志
 		// grpc.WithUnaryServerInterceptor(grpcx.Server.UnaryValidate),
 		// logx.Info("Service registration completed")
+		// 拦截器上下文（请求级）
 		grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-		    // 添加请求拦截器
+		    // 添加追踪拦截器前需要先提取上下文
+			logx.Debugf("拦截器上下文ID: %p", ctx)
+			ctx = otel.GetTextMapPropagator().Extract(ctx, propagation.HeaderCarrier(metadata.New(nil)))
+  
+			// 添加请求拦截器
 			logx.Info("RPC请求开始处理", logx.Field("method", info.FullMethod))
             start := time.Now()
             defer func() {
@@ -231,8 +324,9 @@ func main() {
             }()
 
 			// 添加追踪拦截器
-			tr := otel.Tracer("account.rpc")
+			tr := otel.Tracer("account-tracer")
 			logx.Debugf("创建新的span: %s", info.FullMethod)
+			// 创建span时需要携带正确的上下文 使用请求上下文创建span
 			ctx, span := tr.Start(ctx, info.FullMethod,
                 trace.WithAttributes(
                     attribute.String("rpc.service", "account"),
@@ -242,11 +336,21 @@ func main() {
 			logx.Debugf("创建Span >> TraceID:%s", span.SpanContext().TraceID())
 			defer func() {
 				span.End()
-				logx.Debugf("结束Span >> TraceID:%s", span.SpanContext().TraceID())
-				// 在拦截器结束时强制立即导出
-				if err := tp.ForceFlush(context.Background()); err != nil {
-					logx.Error("强制刷新追踪数据失败", logx.Field("error", err))
+				if span.SpanContext().TraceID().IsValid() {
+					logx.Debugf("追踪数据已生成，TraceID: %s", span.SpanContext().TraceID())
+				} else {
+					logx.Error("生成的TraceID无效")
 				}
+				// 异步刷新避免阻塞请求
+				go func() {
+					logx.Debugf("结束Span >> TraceID:%s", span.SpanContext().TraceID())
+					ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+					defer cancel()
+					// 在拦截器结束时强制立即导出
+					if err := tp.ForceFlush(ctx); err != nil {
+						logx.Error("强制刷新追踪数据失败", logx.Field("error", err))
+					}
+				}()
 			}()
 
 		    // 记录自定义属性
@@ -254,6 +358,7 @@ func main() {
 			    attribute.String("rpc.method", info.FullMethod),
 		    )
 
+			// 必须将新上下文传递给后续处理
             return handler(ctx, req)
 		}),
 	)
@@ -361,4 +466,14 @@ func (l *logSpanProcessor) Shutdown(ctx context.Context) error {
 
 func (l *logSpanProcessor) ForceFlush(ctx context.Context) error {
     return nil
+}
+
+// 添加自定义日志写入器
+type logWriter struct {
+    logger func(...interface{})
+}
+
+func (l *logWriter) Write(p []byte) (n int, err error) {
+    l.logger("OpenTelemetry Span Output: ", string(p))
+    return len(p), nil
 }

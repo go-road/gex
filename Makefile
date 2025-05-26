@@ -104,7 +104,7 @@ build:
 	go build -ldflags="-s -w" -o ./bin/klinerpc ./app/quotes/kline/rpc/kline.go
 
 rebuild-accountrpc: 
-	# docker stop accountrpc && docker rm accountrpc
+	docker stop accountrpc && docker rm accountrpc
 	go build -ldflags="-s -w" -o ./bin/accountrpc ./app/account/rpc/account.go
 	docker compose -f deploy/dockerfiles/docker-compose.yaml build accountrpc
 	docker compose -f deploy/dockerfiles/docker-compose.yaml up -d --force-recreate accountrpc

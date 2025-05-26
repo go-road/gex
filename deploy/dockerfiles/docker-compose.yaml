@@ -24,6 +24,8 @@ services:
     entrypoint: ["/app/accountrpc","-f","/app/account.yaml"]
     ports: # 映射端口
       - "20002:20002"
+    environment:
+      - OTEL_LOG_LEVEL=debug
     networks:
       - gex
   matchmq:

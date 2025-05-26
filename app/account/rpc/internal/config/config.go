@@ -16,4 +16,12 @@ type Config struct {
 	PulsarConfig     pulsar.PulsarConfig
 	RedisConf        redis.RedisConf
 	SymbolEtcdConfig etcd.EtcdConfig
+	OTLP             OTLPConfig `yaml:"otlp"`
+}
+
+type OTLPConfig struct {
+	Endpoint   string `yaml:"endpoint"`    // 对应环境变量 OTEL_EXPORTER_OTLP_ENDPOINT
+	Insecure   bool   `yaml:"insecure"`    // 对应环境变量 OTEL_EXPORTER_OTLP_INSECURE
+	Timeout    int    `yaml:"timeout"`     // 单位秒，对应 OTEL_EXPORTER_OTLP_TIMEOUT
+	ExportType string `yaml:"exportType"` // grpc/http 对应 OTEL_EXPORTER_OTLP_PROTOCOL
 }
