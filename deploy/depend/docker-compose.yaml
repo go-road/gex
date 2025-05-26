@@ -3,13 +3,17 @@ services:
     image: registry.cn-hangzhou.aliyuncs.com/zhengqing/pulsar:3.1.2  # 原镜像`apachepulsar/pulsar:3.1.2`
     container_name: pulsar
     restart: unless-stopped
-    #    volumes:
-    #      - "./pulsar/data:/pulsar/data"
-    #      - "./pulsar/conf:/pulsar/conf"
+    volumes:
+      - "./pulsar/data:/pulsar/data"
+      # - "./pulsar/conf:/pulsar/conf"  
+    # user: "10000:10000"  # 添加用户声明，使用容器默认用户ID   
+    user: "root"  # 使用root用户
     environment: # 设置环境变量,相当于docker run命令中的-e
       TZ: Asia/Shanghai
       LANG: en_US.UTF-8
       BOOKIE_MEM: -Xms512m -Xmx512m -XX:MaxDirectMemorySize=256m
+      # PULSAR_PREFIX_dockerUser: 10000  # 设置容器内用户
+      # PULSAR_PREFIX_dockerGroup: 10000 # 设置容器内用户组
     command: >
       /bin/bash -c 
       "bin/apply-config-from-env.py conf/standalone.conf && exec bin/pulsar standalone --advertised-address pulsar"

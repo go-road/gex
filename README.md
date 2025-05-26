@@ -155,6 +155,9 @@ make dep2
 # 检查容器状态
 docker ps 
 
+# 删除所有的none镜像
+docker images -a | grep none | awk '{print $3}' | xargs docker rmi
+
 # 查看所有注册服务
 docker exec etcd etcdctl get --prefix "" --keys-only
 
