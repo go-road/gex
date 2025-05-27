@@ -1,0 +1,45 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Debug Account API",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "app/account/api/account.go",
+            "args": ["-f", "/git/gex/app/account/api/etc/account_local_20024.yaml"],
+            "env": {
+                "OTEL_LOG_LEVEL": "debug"  
+            }
+        },
+        {
+            "name": "Debug Account RPC",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "app/account/rpc/account.go",
+            "args": ["-f", "/git/gex/app/account/rpc/etc/account_local_20012.yaml"], 
+            "env": {
+                "OTEL_LOG_LEVEL": "debug"
+            }
+        },
+        {
+            "name": "Launch file",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${file}"
+        },
+        {
+            "name": "Launch Package",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${fileDirname}"
+        }
+    ]
+}

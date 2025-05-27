@@ -677,7 +677,12 @@ grpcurl -plaintext -proto jaeger/proto/api_v2/query.proto -proto jaeger/proto/ap
 4.本地服务配置是否指向有效etcd地址
 ```bash
 # 查看etcd中的注册信息（应有accountRpc的键值）
-docker exec etcd etcdctl get --prefix /accountRpc
+docker exec etcd etcdctl get --prefix accountRpc
+# 可停止容器后只启动本地服务便于开发调试，如果有多个服务注册时输出如下：
+accountRpc/112474613211408096
+172.23.0.17:20002
+accountRpc/112474613211408760
+192.168.1.4:20012
 
 # 查看accountrpc容器状态
 docker ps | grep accountrpc
