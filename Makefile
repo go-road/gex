@@ -57,6 +57,7 @@ kline:
 run:
 	make pre
 	chmod +x ./deploy/scripts/run.sh
+	sudo rm -rf deploy/depend/pulsar/data/*	
 	./deploy/scripts/run.sh
 
 stop:
@@ -103,9 +104,21 @@ build:
 	go build -ldflags="-s -w" -o ./bin/quoteapi ./app/quotes/api/quote.go
 	go build -ldflags="-s -w" -o ./bin/klinerpc ./app/quotes/kline/rpc/kline.go
 
+rebuild-accountapi:
+	go build  -ldflags="-s -w"  -o ./bin/accountapi ./app/account/api/account.go
+	docker compose -f deploy/dockerfiles/docker-compose.yaml build accountapi
+	docker compose -f deploy/dockerfiles/docker-compose.yaml up -d --force-recreate accountapi
+	docker logs -f accountapi
+	
 rebuild-accountrpc: 
-	docker stop accountrpc && docker rm accountrpc
+	# docker stop accountrpc && docker rm accountrpc
 	go build -ldflags="-s -w" -o ./bin/accountrpc ./app/account/rpc/account.go
 	docker compose -f deploy/dockerfiles/docker-compose.yaml build accountrpc
 	docker compose -f deploy/dockerfiles/docker-compose.yaml up -d --force-recreate accountrpc
 	docker logs -f accountrpc
+
+rebuild-pulsar:
+	docker compose -f deploy/depend/docker-compose.yaml down pulsar
+	sudo rm -rf deploy/depend/pulsar/data/*	
+	./deploy/scripts/run.sh
+	docker logs pulsar -f

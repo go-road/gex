@@ -180,6 +180,9 @@ docker compose -f deploy/dockerfiles/docker-compose.yaml run -d --service-ports 
 # 进入容器查看环境变量
 docker exec accountrpc env | grep OTEL
 
+# 进入容器查看配置文件
+docker exec accountrpc cat /app/account.yaml | grep -E 'otlp|endpoint|insecure|timeout|exportType'
+
 # 检查导出器文件权限
 docker exec accountrpc sh -c "ls -l /dev/stdout"
 
@@ -264,167 +267,9 @@ docker exec jaeger /go/bin/all-in-one-linux --help | grep "grpc-server.enable-re
 docker exec jaeger /go/bin/all-in-one-linux --help | grep -E 'reflection|enable-reflection'
 # 正确输出应包含该参数说明
 
-```
-### jaeger 命令参数
-```bash
-root@LenovoLG:/git/gex# docker exec -it jaeger /go/bin/all-in-one-linux help
-2025/05/26 09:18:54 maxprocs: Leaving GOMAXPROCS=8: CPU quota undefined
-2025/05/26 09:18:54 application version: git-commit=b620f0eaefa5f17ec4bd01195149f158023a4e8e, git-version=v1.53.0, build-date=2024-01-08T18:05:40Z
-Jaeger all-in-one distribution with agent, collector and query. Use with caution this version
-by default uses only in-memory database.
+# jaeger 命令参数
+docker exec -it jaeger /go/bin/all-in-one-linux help
 
-Usage:
-  jaeger-all-in-one [flags]
-  jaeger-all-in-one [command]
-
-Available Commands:
-  completion  Generate the autocompletion script for the specified shell
-  docs        Generates documentation
-  env         Help about environment variables.
-  help        Help about any command
-  status      Print the status.
-  version     Print the version.
-
-Flags:
-      --admin.http.host-port string                               The host:port (e.g. 127.0.0.1:14269 or :14269) for the admin server, including health check, /metrics, etc. (default ":14269")
-      --admin.http.tls.cert string                                Path to a TLS Certificate file, used to identify this server to clients
-      --admin.http.tls.cipher-suites string                       Comma-separated list of cipher suites for the server, values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-      --admin.http.tls.client-ca string                           Path to a TLS CA (Certification Authority) file used to verify certificates presented by clients (if unset, all clients are permitted)
-      --admin.http.tls.enabled                                    Enable TLS on the server
-      --admin.http.tls.key string                                 Path to a TLS Private Key file, used to identify this server to clients
-      --admin.http.tls.max-version string                         Maximum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --admin.http.tls.min-version string                         Minimum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --collector.enable-span-size-metrics                        Enables metrics based on processed span size, which are more expensive to calculate.
-      --collector.grpc-server.host-port string                    The host:port (e.g. 127.0.0.1:12345 or :12345) of the collector's gRPC server (default ":14250")
-      --collector.grpc-server.max-connection-age duration         The maximum amount of time a connection may exist. Set this value to a few seconds or minutes on highly elastic environments, so that clients discover new collector nodes frequently. See https://pkg.go.dev/google.golang.org/grpc/keepalive#ServerParameters (default 0s)
-      --collector.grpc-server.max-connection-age-grace duration   The additive period after MaxConnectionAge after which the connection will be forcibly closed. See https://pkg.go.dev/google.golang.org/grpc/keepalive#ServerParameters (default 0s)
-      --collector.grpc-server.max-message-size int                The maximum receivable message size for the collector's gRPC server (default 4194304)
-      --collector.grpc.tls.cert string                            Path to a TLS Certificate file, used to identify this server to clients
-      --collector.grpc.tls.cipher-suites string                   Comma-separated list of cipher suites for the server, values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-      --collector.grpc.tls.client-ca string                       Path to a TLS CA (Certification Authority) file used to verify certificates presented by clients (if unset, all clients are permitted)
-      --collector.grpc.tls.enabled                                Enable TLS on the server
-      --collector.grpc.tls.key string                             Path to a TLS Private Key file, used to identify this server to clients
-      --collector.grpc.tls.max-version string                     Maximum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --collector.grpc.tls.min-version string                     Minimum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --collector.http-server.host-port string                    The host:port (e.g. 127.0.0.1:12345 or :12345) of the collector's HTTP server (default ":14268")
-      --collector.http-server.idle-timeout duration               See https://pkg.go.dev/net/http#Server (default 0s)
-      --collector.http-server.read-header-timeout duration        See https://pkg.go.dev/net/http#Server (default 2s)
-      --collector.http-server.read-timeout duration               See https://pkg.go.dev/net/http#Server (default 0s)
-      --collector.http.tls.cert string                            Path to a TLS Certificate file, used to identify this server to clients
-      --collector.http.tls.cipher-suites string                   Comma-separated list of cipher suites for the server, values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-      --collector.http.tls.client-ca string                       Path to a TLS CA (Certification Authority) file used to verify certificates presented by clients (if unset, all clients are permitted)
-      --collector.http.tls.enabled                                Enable TLS on the server
-      --collector.http.tls.key string                             Path to a TLS Private Key file, used to identify this server to clients
-      --collector.http.tls.max-version string                     Maximum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --collector.http.tls.min-version string                     Minimum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --collector.num-workers int                                 The number of workers pulling items from the queue (default 50)
-      --collector.otlp.enabled                                    Enables OpenTelemetry OTLP receiver on dedicated HTTP and gRPC ports (default true)
-      --collector.otlp.grpc.host-port string                      The host:port (e.g. 127.0.0.1:12345 or :12345) of the collector's gRPC server
-      --collector.otlp.grpc.max-connection-age duration           The maximum amount of time a connection may exist. Set this value to a few seconds or minutes on highly elastic environments, so that clients discover new collector nodes frequently. See https://pkg.go.dev/google.golang.org/grpc/keepalive#ServerParameters (default 0s)
-      --collector.otlp.grpc.max-connection-age-grace duration     The additive period after MaxConnectionAge after which the connection will be forcibly closed. See https://pkg.go.dev/google.golang.org/grpc/keepalive#ServerParameters (default 0s)
-      --collector.otlp.grpc.max-message-size int                  The maximum receivable message size for the collector's gRPC server (default 4194304)
-      --collector.otlp.grpc.tls.cert string                       Path to a TLS Certificate file, used to identify this server to clients
-      --collector.otlp.grpc.tls.cipher-suites string              Comma-separated list of cipher suites for the server, values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-      --collector.otlp.grpc.tls.client-ca string                  Path to a TLS CA (Certification Authority) file used to verify certificates presented by clients (if unset, all clients are permitted)
-      --collector.otlp.grpc.tls.enabled                           Enable TLS on the server
-      --collector.otlp.grpc.tls.key string                        Path to a TLS Private Key file, used to identify this server to clients
-      --collector.otlp.grpc.tls.max-version string                Maximum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --collector.otlp.grpc.tls.min-version string                Minimum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --collector.otlp.grpc.tls.reload-interval duration          The duration after which the certificate will be reloaded (0s means will not be reloaded) (default 0s)
-      --collector.otlp.http.cors.allowed-headers string           Comma-separated CORS allowed headers. See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Headers
-      --collector.otlp.http.cors.allowed-origins string           Comma-separated CORS allowed origins. See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
-      --collector.otlp.http.host-port string                      The host:port (e.g. 127.0.0.1:12345 or :12345) of the collector's HTTP server
-      --collector.otlp.http.idle-timeout duration                 See https://pkg.go.dev/net/http#Server (default 0s)
-      --collector.otlp.http.read-header-timeout duration          See https://pkg.go.dev/net/http#Server (default 2s)
-      --collector.otlp.http.read-timeout duration                 See https://pkg.go.dev/net/http#Server (default 0s)
-      --collector.otlp.http.tls.cert string                       Path to a TLS Certificate file, used to identify this server to clients
-      --collector.otlp.http.tls.cipher-suites string              Comma-separated list of cipher suites for the server, values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-      --collector.otlp.http.tls.client-ca string                  Path to a TLS CA (Certification Authority) file used to verify certificates presented by clients (if unset, all clients are permitted)
-      --collector.otlp.http.tls.enabled                           Enable TLS on the server
-      --collector.otlp.http.tls.key string                        Path to a TLS Private Key file, used to identify this server to clients
-      --collector.otlp.http.tls.max-version string                Maximum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --collector.otlp.http.tls.min-version string                Minimum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --collector.otlp.http.tls.reload-interval duration          The duration after which the certificate will be reloaded (0s means will not be reloaded) (default 0s)
-      --collector.queue-size int                                  The queue size of the collector (default 2000)
-      --collector.queue-size-memory uint                          (experimental) The max memory size in MiB to use for the dynamic queue.
-      --collector.tags string                                     One or more tags to be added to the Process tags of all spans passing through this collector. Ex: key1=value1,key2=${envVar:defaultValue}
-      --collector.zipkin.cors.allowed-headers string              Comma-separated CORS allowed headers. See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Headers
-      --collector.zipkin.cors.allowed-origins string              Comma-separated CORS allowed origins. See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
-      --collector.zipkin.host-port string                         The host:port (e.g. 127.0.0.1:9411 or :9411) of the collector's Zipkin server (disabled by default)
-      --collector.zipkin.keep-alive                               KeepAlive configures allow Keep-Alive for Zipkin HTTP server (enabled by default) (default true)
-      --collector.zipkin.tls.cert string                          Path to a TLS Certificate file, used to identify this server to clients
-      --collector.zipkin.tls.cipher-suites string                 Comma-separated list of cipher suites for the server, values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-      --collector.zipkin.tls.client-ca string                     Path to a TLS CA (Certification Authority) file used to verify certificates presented by clients (if unset, all clients are permitted)
-      --collector.zipkin.tls.enabled                              Enable TLS on the server
-      --collector.zipkin.tls.key string                           Path to a TLS Private Key file, used to identify this server to clients
-      --collector.zipkin.tls.max-version string                   Maximum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --collector.zipkin.tls.min-version string                   Minimum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --config-file string                                        Configuration file in JSON, TOML, YAML, HCL, or Java properties formats (default none). See spf13/viper for precedence.
-      --downsampling.hashsalt string                              Salt used when hashing trace id for downsampling.
-      --downsampling.ratio float                                  Ratio of spans passed to storage after downsampling (between 0 and 1), e.g ratio = 0.3 means we are keeping 30% of spans and dropping 70% of spans; ratio = 1.0 disables downsampling. (default 1)
-  -h, --help                                                      help for jaeger-all-in-one
-      --http-server.host-port string                              host:port of the http server (e.g. for /sampling point and /baggageRestrictions endpoint) (default ":5778")
-      --log-level string                                          Minimal allowed log Level. For more levels see https://github.com/uber-go/zap (default "info")
-      --memory.max-traces int                                     The maximum amount of traces to store in memory. The default number of traces is unbounded.
-      --metrics-backend string                                    Defines which metrics backend to use for metrics reporting: prometheus, none, or expvar (deprecated, will be removed after 2024-01-01 or in release v1.53.0, whichever is later)  (default "prometheus")
-      --metrics-http-route string                                 Defines the route of HTTP endpoint for metrics backends that support scraping (default "/metrics")
-      --multi-tenancy.enabled                                     Enable tenancy header when receiving or querying
-      --multi-tenancy.header string                               HTTP header carrying tenant (default "x-tenant")
-      --multi-tenancy.tenants string                              comma-separated list of allowed values for --multi-tenancy.header header.  (If not supplied, tenants are not restricted)
-      --processor.jaeger-binary.server-host-port string           host:port for the UDP server (default ":6832")
-      --processor.jaeger-binary.server-max-packet-size int        max packet size for the UDP server (default 65000)
-      --processor.jaeger-binary.server-queue-size int             length of the queue for the UDP server (default 1000)
-      --processor.jaeger-binary.server-socket-buffer-size int     socket buffer size for UDP packets in bytes
-      --processor.jaeger-binary.workers int                       how many workers the processor should run (default 10)
-      --processor.jaeger-compact.server-host-port string          host:port for the UDP server (default ":6831")
-      --processor.jaeger-compact.server-max-packet-size int       max packet size for the UDP server (default 65000)
-      --processor.jaeger-compact.server-queue-size int            length of the queue for the UDP server (default 1000)
-      --processor.jaeger-compact.server-socket-buffer-size int    socket buffer size for UDP packets in bytes
-      --processor.jaeger-compact.workers int                      how many workers the processor should run (default 10)
-      --processor.zipkin-compact.server-host-port string          host:port for the UDP server (default ":5775")
-      --processor.zipkin-compact.server-max-packet-size int       max packet size for the UDP server (default 65000)
-      --processor.zipkin-compact.server-queue-size int            length of the queue for the UDP server (default 1000)
-      --processor.zipkin-compact.server-socket-buffer-size int    socket buffer size for UDP packets in bytes
-      --processor.zipkin-compact.workers int                      how many workers the processor should run (default 10)
-      --query.additional-headers strings                          Additional HTTP response headers.  Can be specified multiple times.  Format: "Key: Value" (default [])
-      --query.base-path string                                    The base path for all HTTP routes, e.g. /jaeger; useful when running behind a reverse proxy. See https://github.com/jaegertracing/jaeger/blob/main/examples/reverse-proxy/README.md (default "/")
-      --query.bearer-token-propagation                            Allow propagation of bearer token to be used by storage plugins
-      --query.enable-tracing                                      Enables emitting jaeger-query traces
-      --query.grpc-server.host-port string                        The host:port (e.g. 127.0.0.1:14250 or :14250) of the query's gRPC server (default ":16685")
-      --query.grpc.tls.cert string                                Path to a TLS Certificate file, used to identify this server to clients
-      --query.grpc.tls.cipher-suites string                       Comma-separated list of cipher suites for the server, values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-      --query.grpc.tls.client-ca string                           Path to a TLS CA (Certification Authority) file used to verify certificates presented by clients (if unset, all clients are permitted)
-      --query.grpc.tls.enabled                                    Enable TLS on the server
-      --query.grpc.tls.key string                                 Path to a TLS Private Key file, used to identify this server to clients
-      --query.grpc.tls.max-version string                         Maximum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --query.grpc.tls.min-version string                         Minimum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --query.http-server.host-port string                        The host:port (e.g. 127.0.0.1:14268 or :14268) of the query's HTTP server (default ":16686")
-      --query.http.tls.cert string                                Path to a TLS Certificate file, used to identify this server to clients
-      --query.http.tls.cipher-suites string                       Comma-separated list of cipher suites for the server, values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-      --query.http.tls.client-ca string                           Path to a TLS CA (Certification Authority) file used to verify certificates presented by clients (if unset, all clients are permitted)
-      --query.http.tls.enabled                                    Enable TLS on the server
-      --query.http.tls.key string                                 Path to a TLS Private Key file, used to identify this server to clients
-      --query.http.tls.max-version string                         Maximum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --query.http.tls.min-version string                         Minimum TLS version supported (Possible values: 1.0, 1.1, 1.2, 1.3)
-      --query.log-static-assets-access                            Log when static assets are accessed (for debugging)
-      --query.max-clock-skew-adjustment duration                  The maximum delta by which span timestamps may be adjusted in the UI due to clock skew; set to 0s to disable clock skew adjustments (default 0s)
-      --query.static-files string                                 The directory path override for the static assets for the UI
-      --query.ui-config string                                    The path to the UI configuration file in JSON format
-      --reporter.grpc.discovery.min-peers int                     Max number of collectors to which the agent will try to connect at any given time (default 3)
-      --reporter.grpc.host-port string                            Comma-separated string representing host:port of a static list of collectors to connect to directly
-      --reporter.grpc.retry.max uint                              Sets the maximum number of retries for a call (default 3)
-      --reporter.grpc.tls.ca string                               Path to a TLS CA (Certification Authority) file used to verify the remote server(s) (by default will use the system truststore)
-      --reporter.grpc.tls.cert string                             Path to a TLS Certificate file, used to identify this process to the remote server(s)
-      --reporter.grpc.tls.enabled                                 Enable TLS when talking to the remote server(s)
-      --reporter.grpc.tls.key string                              Path to a TLS Private Key file, used to identify this process to the remote server(s)
-      --reporter.grpc.tls.server-name string                      Override the TLS server name we expect in the certificate of the remote server(s)
-      --reporter.grpc.tls.skip-host-verify                        (insecure) Skip server's certificate chain and host name verification
-      --reporter.type string                                      Reporter type to use e.g. grpc (default "grpc")
-      --sampling.strategies-file string                           The path for the sampling strategies file in JSON format. See sampling documentation to see format of the file
-      --sampling.strategies-reload-interval duration              Reload interval to check and reload sampling strategies file. Zero value means no reloading (default 0s)
-      --span-storage.type string                                  (deprecated) please use SPAN_STORAGE_TYPE environment variable. Run this binary with the 'env' command for help.
-
-Use "jaeger-all-in-one [command] --help" for more information about a command.
 ```
 
 ## 修改后重新构建容器
@@ -789,6 +634,10 @@ telnet etcd 2379   # 验证端口连通性
 # 测试jaeger连接
 docker exec -it accountrpc sh
 telnet jaeger 4317
+docker exec jaeger sh -c "netstat -tuln | grep 4317"
+
+# Jaeger 的 OTLP HTTP 接收器地址
+curl -v http://jaeger:4318/v1/traces
 
 # 使用grpcurl检查jaeger服务列表
 docker exec jaeger env | grep GRPC

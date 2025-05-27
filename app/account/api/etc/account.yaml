@@ -40,3 +40,12 @@ LoggerConfig:
 LanguageEtcdConf:
   Endpoints: ["etcd:2379"]
   DialTimeout: 5
+
+# [jaeger zipkin otlpgrpc otlphttp file]  jaeger 是 go-zero 早期版本对接 Jaeger agent 的配置方式（基于 UDP 的 Thrift 协议）
+Telemetry:
+  Name: account-api-service
+  Sampler: 1.0
+  Endpoint: jaeger:4318
+  Batcher: otlphttp 
+  # Endpoint: jaeger:4317
+  # Batcher: otlpgrpc  

@@ -130,21 +130,36 @@ func initTracer(c config.Config) (*sdktrace.TracerProvider, error) {
 	}
 
 	// 添加导出器健康检查
-	// if err := exporter.Start(context.Background()); err != nil {
+	// if err := exporter.Start(ctx); err != nil {
 	// 	logx.Error("导出器启动失败", logx.Field("error", err))
-	// 	return nil, err
+	// 	return nil, fmt.Errorf("导出器启动失败: %v", err)
 	// }
+	// 使用独立的上下文用于启动导出器
+	// startCtx, startCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// defer startCancel()
+	// // 使用互斥锁确保导出器只启动一次
+    // var exporterStartOnce sync.Once
+    // var startErr error
+    // exporterStartOnce.Do(func() {
+	// 	logx.Info("正在启动导出器...")
+    //     startErr = exporter.Start(startCtx)
+    // })
+    // if startErr != nil {
+    //     logx.Error("导出器启动失败", logx.Field("error", startErr))
+    //     return nil, fmt.Errorf("导出器启动失败: %v", startErr)
+    // }
 
 	logx.Info("导出器创建成功,正在配置资源信息...")
 	// 配置资源信息
+	logx.Info("默认资源属性...", resource.Default())
 	res, err := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceName("account-rpc-service"),
+			semconv.ServiceName(c.Name),
 			semconv.ServiceVersion("v1.0.0"),
-			semconv.DeploymentEnvironment("prod"),
-			attribute.String("host.name", "account-rpc"),
+			semconv.DeploymentEnvironment(c.Mode),
+			attribute.String("host.name", os.Getenv("HOSTNAME")),
 			attribute.String("service.instance.id", os.Getenv("HOSTNAME")), // 添加实例标识
     		attribute.String("exporter", "jaeger"),     
 			// semconv.ServiceNameKey.String("account.rpc"), // 强制指定服务名
@@ -237,6 +252,9 @@ func main() {
 	ctx := svc.NewServiceContext(c)
 	consumer.InitConsumer(ctx)
 
+	// 打印原始配置内容
+    configData, _ := os.ReadFile(*configFile)
+    logx.Infof("原始配置文件内容:\n%s", string(configData))
 	// 打印完整配置树
     logx.Infof("完整配置结构: %+v", c) 
     // 专门打印OTLP配置
@@ -260,11 +278,14 @@ func main() {
 		return
 	}
 	logx.Info("OpenTelemetry追踪器已初始化", 
-    logx.Field("service", "account-rpc-service"),
-    logx.Field("endpoint", "jaeger:4318"))
+    logx.Field("service", c.Name),
+    logx.Field("endpoint", c.OTLP.Endpoint))
 	// defer tp.Shutdown(context.Background())
-	defer func() {
-        if err := tp.Shutdown(context.Background()); err != nil {
+	// 使用context确保优雅关闭
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    defer func() {
+        if err := tp.Shutdown(shutdownCtx); err != nil {
             logx.Error("关闭追踪器失败", logx.Field("error", err))
         }
     }()
@@ -282,6 +303,10 @@ func main() {
         grpc.StatsHandler(otelgrpc.NewServerHandler(
 			otelgrpc.WithTracerProvider(tp), // 使用自定义的TracerProvider
 			otelgrpc.WithPropagators(otel.GetTextMapPropagator()), // 使用全局传播器
+			otelgrpc.WithSpanOptions(trace.WithAttributes(
+				attribute.String("service.name", c.Name),
+				attribute.String("library.language", "go"),
+        	)),
 		))  
         // grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor())
 
@@ -312,16 +337,6 @@ func main() {
 		    // 添加追踪拦截器前需要先提取上下文
 			logx.Debugf("拦截器上下文ID: %p", ctx)
 			ctx = otel.GetTextMapPropagator().Extract(ctx, propagation.HeaderCarrier(metadata.New(nil)))
-  
-			// 添加请求拦截器
-			logx.Info("RPC请求开始处理", logx.Field("method", info.FullMethod))
-            start := time.Now()
-            defer func() {
-				logx.Info("RPC请求处理完成", 
-					logx.Field("method", info.FullMethod), 
-					logx.Field("duration", time.Since(start)),
-				)
-            }()
 
 			// 添加追踪拦截器
 			tr := otel.Tracer("account-tracer")
@@ -329,10 +344,15 @@ func main() {
 			// 创建span时需要携带正确的上下文 使用请求上下文创建span
 			ctx, span := tr.Start(ctx, info.FullMethod,
                 trace.WithAttributes(
-                    attribute.String("rpc.service", "account"),
+                    attribute.String("rpc.service", c.Name),
                     attribute.String("rpc.method", info.FullMethod),
                 ),
             )
+			// 记录自定义属性
+		    // span.SetAttributes(
+			//     attribute.String("rpc.method", info.FullMethod),
+		    // )
+
 			logx.Debugf("创建Span >> TraceID:%s", span.SpanContext().TraceID())
 			defer func() {
 				span.End()
@@ -353,10 +373,15 @@ func main() {
 				}()
 			}()
 
-		    // 记录自定义属性
-		    span.SetAttributes(
-			    attribute.String("rpc.method", info.FullMethod),
-		    )
+			// 添加请求拦截器
+			logx.Info("RPC请求开始处理", logx.Field("method", info.FullMethod))
+            start := time.Now()
+            defer func() {
+				logx.Info("RPC请求处理完成", 
+					logx.Field("method", info.FullMethod), 
+					logx.Field("duration", time.Since(start)),
+				)
+            }()
 
 			// 必须将新上下文传递给后续处理
             return handler(ctx, req)

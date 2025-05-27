@@ -133,6 +133,28 @@ echo "创建Pulsar主题..."
 create_topic_with_retry "match_source_IKUN_USDT"
 create_topic_with_retry "match_result_IKUN_USDT"
 
+check_topic_availability() {
+    local topic=$1
+    local max_retries=10
+    local retry_count=0
+    
+    until docker exec pulsar /pulsar/bin/pulsar-admin topics list public/trade | grep -q "^persistent://public/trade/$topic$"; do
+        echo "等待主题 $topic 就绪... ($((retry_count+1))/$max_retries)"
+        sleep 5
+        ((retry_count++))
+        
+        if [ $retry_count -eq $max_retries ]; then
+            echo "错误：主题 $topic 未在指定时间内创建成功"
+            return 1
+        fi
+    done
+    echo "主题 $topic 已确认可用"
+}
+
+echo "验证主题可用性..."
+check_topic_availability "match_source_IKUN_USDT" || exit 1
+check_topic_availability "match_result_IKUN_USDT" || exit 1
+
 # 容器首次启动成功后从容器拷贝pulsar配置文件
 # docker cp pulsar:/pulsar/conf/. deploy/depend/pulsar/conf/
 
