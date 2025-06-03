@@ -47,7 +47,7 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 	d := strings.Split(c.RpcServerConf.ListenOn, ":")
 	c.EtcdRegisterConf.Key += "/" + c.Symbol
 	c.EtcdRegisterConf.Port = cast.ToInt32(d[1])
-	c.EtcdRegisterConf.MataData = attributes.New("symbol", c.Symbol)
+	c.EtcdRegisterConf.MetaData = attributes.New("symbol", c.Symbol)
 	etcd.Register(c.EtcdRegisterConf)
 
 	client, err := c.PulsarConfig.BuildClient()
@@ -55,14 +55,14 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 		logx.Severef("init pulsar client failed err %v", err)
 	}
 	topic := pulsarConfig.Topic{
-		Tenant:    pulsarConfig.PublicTenant,
-		Namespace: pulsarConfig.GexNamespace,
-		Topic:     pulsarConfig.MatchResultTopic + "_" + c.Symbol,
+		Tenant:    pulsarConfig.PublicTenant,  // public
+		Namespace: pulsarConfig.GexNamespace,  // trade
+		Topic:     pulsarConfig.MatchResultTopic + "_" + c.Symbol, // match_result_IKUN_USDT
 	}
 	producer, err := client.CreateProducer(pulsar.ProducerOptions{
 		Topic:           topic.BuildTopic(),
 		SendTimeout:     10 * time.Second,
-		DisableBatching: true,
+		DisableBatching: true, // 禁用批处理
 	})
 	if err != nil {
 		logx.Severef("init pulsar producer failed %v", logger.ErrorField(err))

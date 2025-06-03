@@ -1,11 +1,13 @@
 package pulsar
 
 import (
-	"github.com/apache/pulsar-client-go/pulsar"
-	pulsarLog "github.com/apache/pulsar-client-go/pulsar/log"
-	"github.com/sirupsen/logrus"
 	"strings"
 	"time"
+
+	"github.com/apache/pulsar-client-go/pulsar"
+	pulsarLog "github.com/apache/pulsar-client-go/pulsar/log"
+	"github.com/dtm-labs/logger"
+	"github.com/sirupsen/logrus"
 )
 
 type PulsarConfig struct {
@@ -55,8 +57,11 @@ type Topic struct {
 	Topic     string
 }
 
+// Topic主要用于传递撮合引擎的撮合结果到各个下游服务
 func (t Topic) BuildTopic() string {
-	return "persistent://" + t.Tenant + "/" + t.Namespace + "/" + t.Topic
+	topic := "persistent://" + t.Tenant + "/" + t.Namespace + "/" + t.Topic
+	logger.Infof("build pulsar topic %s", topic)
+	return topic
 }
 
 const (

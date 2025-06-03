@@ -14,8 +14,8 @@ type Key struct {
 
 // OrderBook 订单簿
 type OrderBook struct {
-	orderBook *rbt.Tree
-	side      enum.Side
+	orderBook *rbt.Tree  // 红黑树存储订单
+	side      enum.Side  // 买卖方向
 }
 
 type DepthPosition struct {

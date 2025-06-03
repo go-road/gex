@@ -39,7 +39,7 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 	d := strings.Split(c.RpcServerConf.ListenOn, ":")
 	c.EtcdRegisterConf.Key += "/" + c.Symbol
 	c.EtcdRegisterConf.Port = cast.ToInt32(d[1])
-	c.EtcdRegisterConf.MataData = attributes.New("symbol", c.Symbol)
+	c.EtcdRegisterConf.MetaData = attributes.New("symbol", c.Symbol)
 	etcd.Register(c.EtcdRegisterConf)
 
 	//初始化pulsar客户端

@@ -189,6 +189,9 @@ docker exec accountrpc sh -c "ls -l /dev/stdout"
 # 查看所有注册服务
 docker exec etcd etcdctl get --prefix "" --keys-only
 
+# 检查etcd健康状态
+docker exec etcd etcdctl endpoint health
+
 # 验证容器间通信（在accountrpc容器中执行）
 docker exec accountrpc sh -c "nc -zv etcd 2379"
 # 成功应显示：etcd (172.23.0.3:2379) open
@@ -203,6 +206,7 @@ docker exec etcd etcdctl get --prefix accountRpc/ --print-value-only | hexdump -
 
 # 查看指定服务实例
 docker exec etcd etcdctl get --prefix accountRpc
+docker exec etcd etcdctl get --prefix accountRpc --keys-only
 docker exec -it etcd etcdctl get language/zh-CN
 docker exec -it etcd etcdctl get Coin/IKUN
 docker exec -it etcd etcdctl get Coin/USDT
@@ -367,9 +371,9 @@ go build -o bin/register app/scripts/register.go
 ``` bash
 # 编译并执行注册脚本
 go build -o bin/order app/scripts/order.go
-./bin/order  -f app/account/api/etc/account_local.yaml
+./bin/order  -f app/account/api/etc/account_local_20024.yaml
 
-go run app/scripts/order.go -f app/account/api/etc/account_local.yaml 
+go run app/scripts/order.go -f app/account/api/etc/account_local_20024.yaml 
 ```
 
 ## 访问接口验证
@@ -411,6 +415,14 @@ curl -X POST http://localhost/account/v1/login \
 -c cookies.txt \
 -L                  
 ```
+### 验证Token
+```bash
+docker exec -it nginx curl -X POST http://accountapi:20014/account/v1/validate_token   -H "Accept: application/json, text/plain, */*"   -H "Content-Type: application/json;charset=UTF-8" -d '{
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VySUQiOjMsIlVzZXJuYW1lIjoibGlzaSIsIk5pY2tOYW1lIjoiIiwiaXNzIjoiemhhbmdzYW4iLCJhdWQiOlsiR1ZBIl0sImV4cCI6MTc0OTQ4NTE5OSwibmJmIjoxNzQ4NjIxMTk5fQ.6JTLdsRHONKuExT9OB129IYHEq-L-JcOX0PZpsvnZUY"
+  }'   
+```
+
+
 
 ### 市价买单接口
 ```bash
@@ -537,6 +549,7 @@ docker network inspect gex | grep jaeger
 
 # 检查某个容器是否正在运行
 docker ps | grep adminapi
+docker ps | grep etcd
 
 # 检查容器日志
 docker logs nginx
@@ -569,7 +582,7 @@ docker network inspect gex --format='{{range .IPAM.Config}}{{.Gateway}}{{end}}'
 docker network inspect gex | grep Gateway
 ```
 ### 2.修改本地服务配置
-`account_local.yaml`
+`account_local_20024.yaml`
 ```yaml
 AccountRpcConf:
   etcd:
@@ -704,7 +717,7 @@ docker compose -f deploy/dockerfiles/docker-compose.yaml down accountapi
 ##  启动本地开发服务
 ```bash
 # 拷贝自account.yaml文件，修改端口避免冲突
-go run app/account/api/account.go -f app/account/api/etc/account_local.yaml
+go run app/account/api/account.go -f app/account/api/etc/account_local_20024.yaml
 
 netstat -tuln | grep 20014  
 netstat -tuln | grep 20024  
@@ -830,3 +843,13 @@ sequenceDiagram
     accountapi->>etcd: 发现accountrpc服务
     etcd-->>accountapi: 返回accountrpc服务地址
 ```
+## wsproxy的作用
+wsproxy通常作为WebSocket请求的代理服务器存在，具有以下作用：
+
+充当反向代理：wsproxy对外暴露固定端口（这里映射到主机的10067和10068端口），客户端连接到wsproxy后，由它转发请求到后端的服务（可能经过内部负载均衡或路由策略）。
+
+隔离与安全：通过wsproxy可以将客户端的直接访问隔离到内部服务（比如wssocket），从而增加一层安全防护，同时使内部服务不直接暴露给外网。
+
+方便统一管理：wsproxy可以统一处理连接管理、鉴权、协议转换、日志记录等工作，减轻后端服务（如wssocket）的负担。
+
+因此，wsproxy的作用是接收外部WebSocket请求，并将其转发给后端服务（比如wssocket），从而实现负载均衡、安全隔离以及简化流量管理。

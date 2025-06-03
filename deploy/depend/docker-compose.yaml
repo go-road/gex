@@ -138,6 +138,8 @@ services:
       - "9992:9992"
     volumes: # 数据卷挂载路径设置,将本机目录映射到容器目录
       - "./ws/socket/config-deploy.toml:/app/config.toml"
+    depends_on:
+      - etcd      
     networks:
       - gex
   dtm:

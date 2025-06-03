@@ -48,7 +48,7 @@ type EtcdRegisterConf struct {
     Key      string
     Value    string                 `json:",optional"`
     Port     int32                  `json:",optional"`
-    MataData *attributes.Attributes `json:",optional"`
+    MetaData *attributes.Attributes `json:",optional"`
 }
 
 func Register(conf EtcdRegisterConf) {
@@ -69,7 +69,7 @@ func Register(conf EtcdRegisterConf) {
        if conf.Value == "" {
           conf.Value = netx.InternalIp() + ":" + cast.ToString(conf.Port)
        }
-       if err := manager.AddEndpoint(context.Background(), conf.Key+"/"+cast.ToString(int64(resp.ID)), endpoints.Endpoint{Addr: conf.Value, Metadata: conf.MataData}, clientv3.WithLease(resp.ID)); err != nil {
+       if err := manager.AddEndpoint(context.Background(), conf.Key+"/"+cast.ToString(int64(resp.ID)), endpoints.Endpoint{Addr: conf.Value, Metadata: conf.MetaData}, clientv3.WithLease(resp.ID)); err != nil {
           logx.Severef("etcd add endpoint err: %v", err)
        }
        c, err := cli.KeepAlive(context.Background(), resp.ID)

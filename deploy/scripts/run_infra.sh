@@ -158,9 +158,11 @@ check_topic_availability "match_result_IKUN_USDT" || exit 1
 # 容器首次启动成功后从容器拷贝pulsar配置文件
 # docker cp pulsar:/pulsar/conf/. deploy/depend/pulsar/conf/
 
-echo "启动应用服务容器..."
-docker compose -f deploy/dockerfiles/docker-compose.yaml up -d
-echo "所有服务启动完成!"
+echo "启动本地应用服务..."
+# docker compose -f deploy/dockerfiles/docker-compose.yaml up -d
+# 开发调试时不使用容器启动本地服务
+echo "基础设施准备就绪，可以启动本地服务..."
+
 
 
 

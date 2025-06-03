@@ -22,6 +22,42 @@ import (
 	"time"
 )
 
+/**
+撮合流程:
+
+1.限价单撮合:
+	-买单从卖盘中找对手方,卖单从买盘中找对手方
+	-判断价格是否匹配(买单价格>=卖单价格)
+	-按照时间优先、价格优先原则撮合
+	-部分成交的订单继续留在订单簿中
+2.市价单撮合:
+	-市价买单按金额撮合,从卖一价开始往上吃单
+	-市价卖单按数量撮合,从买一价开始往下吃单
+	-直到完全成交或无对手方
+
+3.撮合结果处理:
+	-更新订单状态
+	-发送撮合结果消息
+	-更新深度数据
+	-推送行情数据
+整个撮合引擎基于内存撮合,使用红黑树存储订单簿,保证了订单按价格排序的高效性。撮合结果通过消息队列异步处理,保证了撮合的高性能。
+
+这是一个典型的交易所撮合引擎实现,包含了订单簿管理、价格撮合、深度维护等核心功能。代码结构清晰,性能优化合理。	
+
+增加了更新订单已成交数量的逻辑：
+每次撮合成功后,都需要同时更新 taker 和 maker 订单的已成交数量(FilledQty)。更新采用累加方式,使用 Add() 方法将本次成交数量(qty)加到原有的已成交数量上。
+无论是限价单还是市价单,买单卖单都遵循相同的更新逻辑。更新操作在每次撮合匹配成功后立即执行。
+限价买单(matchLimitOrderBuy)
+限价卖单(matchLimitOrderSell)
+市价买单(matchMarkerOrderBuy)
+市价卖单(matchMarketOrderSell)
+确保了:
+1.订单成交数量的准确记录
+2.Taker和Maker订单状态的同步更新 
+3.成交历史的完整追踪
+4.订单状态的实时反映
+*/
+
 // MatchEngine 撮合引擎
 type MatchEngine struct {
 	asks             *OrderBook      //卖盘
@@ -50,14 +86,14 @@ type MatchedRecord struct {
 	Maker Order
 }
 type MatchResult struct {
-	//每一次匹配的结构
+	//每一次匹配的结果 撮合记录
 	MatchedRecords []*MatchedRecord
 	//本次撮合的id
 	MatchID    string
 	CancelResp *CancelResp
 	//撮合时间
 	MatchTime int64
-	//taker为买单
+	//taker是否是买单
 	TakerIsBuy bool
 }
 type CancelResp struct {
@@ -134,7 +170,7 @@ func (m *MatchEngine) updateBestAsk() {
 		m.bestAsk = utils.DecimalZeroMaxPrec
 	} else {
 		m.bestAsk = m.asks.orderBook.Left().Key.(*Key).price
-	}
+	} 
 }
 
 // 匹配市价单卖单
@@ -173,7 +209,8 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 			//takerOrder.UnfilledAmount = takerOrder.UnfilledAmount.Sub(amount)
 			makerOrder.UnfilledQty = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
-			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)
+			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(qty)  // 更新已成交数量
 			takerOrder.FilledAmount = takerOrder.FilledAmount.Add(amount)
 			makerOrder.FilledAmount = makerOrder.FilledAmount.Add(amount)
 			//加入到撮合记录
@@ -196,7 +233,8 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 			takerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledQty = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
-			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)
+			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(qty)  // 更新已成交数量
 
 			takerOrder.FilledAmount = takerOrder.FilledAmount.Add(amount)
 			makerOrder.FilledAmount = makerOrder.FilledAmount.Add(amount)
@@ -223,7 +261,8 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 			makerOrder.UnfilledAmount = makerOrder.UnfilledAmount.Sub(a)
 			takerOrder.FilledAmount = takerOrder.FilledAmount.Add(a)
 			makerOrder.FilledAmount = makerOrder.FilledAmount.Add(a)
-			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)
+			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(qty)  // 更新已成交数量
 
 			//订单的剩余数量
 			matchedRecord = &MatchedRecord{
@@ -312,10 +351,12 @@ LOOP:
 			//更新订单的剩余数量
 			qty := makerOrder.UnfilledQty
 			amount := makerOrder.UnfilledAmount
-			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)
+			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(qty)  // 更新已成交数量
 			takerOrder.UnfilledAmount = takerOrder.UnfilledAmount.Sub(amount)
 			makerOrder.UnfilledQty = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
+
 			takerOrder.FilledAmount = takerOrder.FilledAmount.Add(amount)
 			makerOrder.FilledAmount = makerOrder.FilledAmount.Add(amount)
 			//加入到撮合记录
@@ -333,10 +374,12 @@ LOOP:
 			//更新订单的剩余数量
 			qty := makerOrder.UnfilledQty
 			amount := makerOrder.UnfilledAmount
-			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)
+			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(qty)  // 更新已成交数量	
 			takerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledQty = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
+		
 			takerOrder.FilledAmount = takerOrder.FilledAmount.Add(amount)
 			makerOrder.FilledAmount = makerOrder.FilledAmount.Add(amount)
 			//加入到撮合记录
@@ -364,7 +407,8 @@ LOOP:
 			//金额
 			a := q.Mul(makerOrder.Price)
 			//更新订单的剩余数量
-			takerOrder.FilledQty = takerOrder.FilledQty.Add(q)
+			takerOrder.FilledQty = takerOrder.FilledQty.Add(q)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(q)  // 更新已成交数量
 			takerOrder.UnfilledAmount = takerOrder.UnfilledAmount.Sub(a)
 			makerOrder.UnfilledQty = makerOrder.UnfilledQty.Sub(q)
 			makerOrder.UnfilledAmount = makerOrder.UnfilledAmount.Sub(a)
@@ -457,6 +501,8 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
 			takerOrder.UnfilledAmount = takerOrder.UnfilledAmount.Sub(takerAmount)
 			makerOrder.UnfilledQty = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
+            takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(qty)  // 更新已成交数量			
 			takerOrder.FilledAmount = takerOrder.FilledAmount.Add(amount)
 			makerOrder.FilledAmount = makerOrder.FilledAmount.Add(amount)
 			//加入到撮合记录
@@ -480,6 +526,8 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
 			takerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledQty = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
+            takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(qty)  // 更新已成交数量			
 			takerOrder.FilledAmount = takerOrder.FilledAmount.Add(amount)
 			makerOrder.FilledAmount = makerOrder.FilledAmount.Add(amount)
 			//加入到撮合记录
@@ -504,6 +552,8 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
 			//maker的未成交金额 减 222 *1 价格以maker为准
 			//taker buy 111 1 maker sell 100 1
 			makerOrder.UnfilledAmount = makerOrder.UnfilledAmount.Sub(makerAmount)
+            takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(qty)  // 更新已成交数量			
 			takerOrder.FilledAmount = takerOrder.FilledAmount.Add(makerAmount)
 			makerOrder.FilledAmount = makerOrder.FilledAmount.Add(makerAmount)
 			matchedRecord = &MatchedRecord{
@@ -583,8 +633,10 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
 			makerOrder.UnfilledQty = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
 
-			makerOrder.FilledQty = qty
-			takerOrder.FilledQty = qty
+			// makerOrder.FilledQty = qty
+			// takerOrder.FilledQty = qty
+			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(qty)  // 更新已成交数量
 			takerOrder.FilledAmount = takerOrder.FilledAmount.Add(amount)
 			makerOrder.FilledAmount = makerOrder.FilledAmount.Add(amount)
 			//加入到撮合记录
@@ -606,6 +658,8 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
 			takerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledQty = utils.DecimalZeroMaxPrec
 			makerOrder.UnfilledAmount = utils.DecimalZeroMaxPrec
+			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(qty)  // 更新已成交数量			
 			takerOrder.FilledAmount = takerOrder.FilledAmount.Add(amount)
 			makerOrder.FilledAmount = makerOrder.FilledAmount.Add(amount)
 			//加入到撮合记录
@@ -631,6 +685,8 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
 			//成交的金额不能使用taker的金额
 			//使用maker成交的数量乘以maker的价格
 			makerOrder.UnfilledAmount = makerOrder.UnfilledAmount.Sub(makerAmount)
+			takerOrder.FilledQty = takerOrder.FilledQty.Add(qty)  // 更新已成交数量
+            makerOrder.FilledQty = makerOrder.FilledQty.Add(qty)  // 更新已成交数量
 			takerOrder.FilledAmount = takerOrder.FilledAmount.Add(makerAmount)
 			makerOrder.FilledAmount = makerOrder.FilledAmount.Add(makerAmount)
 			matchedRecord = &MatchedRecord{
@@ -704,6 +760,7 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 		return
 	}
 
+	// 1. 判断是否取消订单
 	if order.IsCancel {
 		orderDetail := o.(*Order)
 		order.UnfilledQty = orderDetail.UnfilledQty
@@ -735,15 +792,16 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 		})
 	} else {
 		logx.Debugf("order = %+v bestBid = %v bestAsk=%v", order, m.bestBid, m.bestAsk)
+		// 2. 根据订单类型和方向进行撮合
 		switch {
 		//买单市价单
 		case order.Side == enum.Side_Buy && order.OrderType == enum.OrderType_MO:
-			m.matchMarkerOrderBuy(order)
+			m.matchMarkerOrderBuy(order)  // 市价买单
 		//买单限价单
 		case order.Side == enum.Side_Buy && order.OrderType == enum.OrderType_LO:
 			//价格大于卖一价，同时卖一价不为零
 			if order.Price.GreaterThanOrEqual(m.bestAsk) && m.bestAsk.GreaterThan(utils.DecimalZeroMaxPrec) {
-				m.matchLimitOrderBuy(order)
+				m.matchLimitOrderBuy(order)   // 限价买单
 			} else {
 				m.addOrder(order)
 				//更新盘口深度
@@ -754,11 +812,11 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 			}
 		//卖单市价单
 		case order.Side == enum.Side_Sell && order.OrderType == enum.OrderType_MO:
-			m.matchMarketOrderSell(order)
+			m.matchMarketOrderSell(order) // 市价卖单
 		//卖单限价单
 		case order.Side == enum.Side_Sell && order.OrderType == enum.OrderType_LO:
 			if order.Price.LessThanOrEqual(m.bestBid) && m.bestBid.GreaterThan(utils.DecimalZeroMaxPrec) {
-				m.matchLimitOrderSell(order)
+				m.matchLimitOrderSell(order)  // 限价卖单
 			} else {
 				m.addOrder(order)
 				//更新盘口深度

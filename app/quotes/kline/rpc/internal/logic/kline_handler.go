@@ -134,6 +134,16 @@ func (kl *KlineHandler) update(matchData <-chan *model.MatchData) {
 }
 
 // 存储历史k线和最新的k线
+// 当同一时间段的k线数据已存在时进行更新，确保k线数据的连续性和准确性,避免重复数据,同时保证数据的一致性。
+// 实现"INSERT ... ON DUPLICATE KEY UPDATE"的功能，当有重复数据时进行更新而不是插入
+// 使用GORM的Clauses和OnConflict实现upsert操作，当遇到主键冲突时,会更新以下字段:
+// open: 开盘价
+// high: 最高价  
+// low: 最低价
+// close: 收盘价
+// amount: 成交量
+// volume: 成交额
+// range: 涨跌幅
 func (kl *KlineHandler) store() {
 	k := kl.svcCtx.Query.Kline
 	for klineData := range kl.storeLatestKline {
@@ -173,6 +183,7 @@ func (kl *KlineHandler) store() {
 				for _, v := range klineData.Klines {
 					data := v.CastToRedisData(kl.svcCtx.Config.SymbolInfo, klineData.MatchID)
 					d, _ := json.Marshal(data)
+					// 将最新的kline数据存储在Redis中
 					if err := kl.svcCtx.RedisClient.Hset(define.Kline.WithParams(), data.Symbol+"_"+v.KlineType.String(), string(d)); err != nil {
 						logx.Errorw("update last kline failed", logger.ErrorField(err))
 						return err

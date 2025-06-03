@@ -3,6 +3,7 @@ authUrl="http://accountapi:20014/account/v1/validate_token"
 
 [server]
 port="9992"
+address = "0.0.0.0" 
 
 [bucket]
 #分区数量

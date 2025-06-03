@@ -1,0 +1,128 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "start all services",
+            "type": "shell",
+            "dependsOn": ["account-rpc-service", "account-api-service", "order-rpc-service", "order-api-service", "quotes-rpc-service", "quotes-api-service", "match-mq", "match-rpc-service", "admin-api-service"],
+            "dependsOrder": "parallel", // 并行启动
+            // "command": "cd user-service && go run main.go & cd order-service && go run main.go & cd gateway && go run main.go",
+            "group": {
+                "kind": "build",
+                "isDefault": true // 设置为默认任务，可通过 Ctrl+Shift+B 直接运行
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated" // 打开独立终端面板
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "account-rpc-service",
+            "type": "shell",
+            "command": "go run app/account/rpc/account.go -f app/account/rpc/etc/account_local_20022.yaml",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },        
+        {
+            "label": "account-api-service",
+            "type": "shell",
+            "command": "go run app/account/api/account.go -f app/account/api/etc/account_local_20024.yaml",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },           
+        {
+            "label": "order-rpc-service",
+            "type": "shell",
+            "command": "go run app/order/rpc/order.go -f app/order/rpc/etc/order_local_20027.yaml",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },        
+        {
+            "label": "order-api-service",
+            "type": "shell",
+            "command": "go run app/order/api/order.go -f app/order/api/etc/order_local_20026.yaml",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },                
+        {
+            "label": "quotes-rpc-service",
+            "type": "shell",
+            "command": "go run app/quotes/kline/rpc/kline.go -f app/quotes/kline/rpc/etc/kline_local_20029.yaml",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },        
+        {
+            "label": "quotes-api-service",
+            "type": "shell",
+            "command": "go run app/quotes/api/quote.go -f app/quotes/api/etc/quote_local_20021.yaml",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },  
+        {
+            "label": "match-mq",
+            "type": "shell",
+            "command": "go run app/match/mq/match.go -f app/match/mq/etc/match.yaml",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },        
+        {
+            "label": "match-rpc-service",
+            "type": "shell",
+            "command": "sleep 10 && go run app/match/rpc/match.go -f app/match/rpc/etc/match_local_20023.yaml",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },          
+        {
+            "label": "admin-api-service",
+            "type": "shell",
+            "command": "go run app/admin/api/admin.go -f app/admin/api/etc/admin_local_20025.yaml",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },         
+        // 「链式任务+并行组」方案,然后将主任务的 dependsOn 改为"delayed-match-rpc"
+        {
+            "label": "delayed-match-rpc",
+            "type": "shell",
+            "command": "sleep 10 && echo '触发延迟任务'",
+            "dependsOn": ["match-rpc-service"]
+        },
+        // 使用 Makefile（更规范的工程化方案）
+        {
+            "label": "Start Local Services",
+            "type": "shell",
+            "command": "make run-local",
+            "problemMatcher": []
+        },
+        {
+            "label": "View Logs", 
+            "type": "shell",
+            "command": "make logs",
+            "problemMatcher": []
+        },
+        {
+            "label": "Stop Services",
+            "type": "shell", 
+            "command": "make stop-local",
+            "problemMatcher": []
+        }
+    ]
+}
