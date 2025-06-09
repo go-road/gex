@@ -835,6 +835,23 @@ func (m *MatchEngine) GetDepth(level int32) DepthData {
 }
 
 // SendMatchResult 发送撮合结果，这个操作不异步。
+/** 
+使用消息队列实现异步解耦的主要场景是在撮合引擎中使用 Pulsar 消息队列实现撮合结果的异步处理。
+主要解耦场景:
+1.撮合引擎与账户资产更新解耦:
+- 撮合引擎只负责撮合订单,将撮合结果发送到消息队列
+- 账户服务异步消费消息队列,更新用户资产
+2.撮合引擎与订单状态更新解耦:
+- 撮合引擎完成撮合后不直接更新订单状态
+- 订单服务异步消费消息队列,更新订单状态
+3.消息幂等性保证:
+- 使用 Redis 存储消息 ID 防止重复消费
+- 不同服务使用不同前缀区分消息 ID
+4.异步处理提升性能:
+- 撮合引擎不需要等待资产和订单更新完成
+- 多个消费者可以并行处理撮合结果
+这种基于消息队列的异步解耦架构提高了系统的可扩展性和性能,同时保证了数据的最终一致性。
+*/
 func (m *MatchEngine) SendMatchResult(matchResult *MatchResult) {
 
 	var resp matchMq.MatchResp
@@ -926,6 +943,7 @@ func (m *MatchEngine) SendMatchResult(matchResult *MatchResult) {
 	logx.Debugw("send match result", logx.Field("data", &resp))
 	data, _ := proto.Marshal(&resp)
 	var err error
+	// 1. 撮合引擎发送撮合结果：撮合引擎通过 Pulsar Producer 将撮合结果发送到消息队列
 	for i := 0; i < 10; i++ {
 		if _, err = m.producer.Send(context.Background(), &pulsar.ProducerMessage{
 			Payload: data,

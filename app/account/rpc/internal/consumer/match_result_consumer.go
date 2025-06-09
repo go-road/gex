@@ -15,6 +15,7 @@ type MatchResultConsumer struct {
 	sc *svc.ServiceContext
 }
 
+// 2. 账户服务消费撮合结果：账户服务通过消费消息队列中的撮合结果来更新用户资产
 func InitConsumer(sc *svc.ServiceContext) {
 	for _, consumer := range sc.MatchConsumerList {
 		go func(c pulsar.Consumer) {

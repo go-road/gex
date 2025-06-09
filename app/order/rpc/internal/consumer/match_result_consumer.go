@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// 3. 订单服务消费撮合结果：订单服务通过消费消息队列中的撮合结果来更新订单状态
 func InitConsumer(sc *svc.ServiceContext) {
 	matchResultHandler := logic.NewHandleMatchResultLogic(sc)
 	go func() {
