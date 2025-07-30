@@ -57,12 +57,15 @@ func createTestMatchEngine() *engine.MatchEngine {
 		},
 		PulsarConfig: pulsarConfig.PulsarConfig{
 			Hosts: []string{"pulsar:6650"},
+			// Hosts: []string{"172.23.0.1:6650"},
 		},
 		WsConf:  zrpc.RpcClientConf{
 			Etcd: discov.EtcdConf{
 				Hosts: []string{"etcd:2379"},
+				// Hosts: []string{"172.23.0.1:2379"},
 				Key: "proxy",
 			},
+			Timeout: 3000,
 		},
 	}
 

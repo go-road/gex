@@ -10,7 +10,7 @@ services:
     ports: # 映射端口
       - "20014:20014"
     networks:
-      - gex
+      - wsl_net
   accountrpc:
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:20002"]
@@ -27,7 +27,7 @@ services:
     environment:
       - OTEL_LOG_LEVEL=debug
     networks:
-      - gex
+      - wsl_net
   matchmq:
     build:
       context: ../../
@@ -36,7 +36,7 @@ services:
     restart: unless-stopped
     entrypoint: ["/app/matchmq","-f","/app/match.yaml"]
     networks:
-      - gex
+      - wsl_net
   matchrpc:
     build:
       context: ../../
@@ -47,7 +47,7 @@ services:
     ports: # 映射端口
       - "20003:20003"
     networks:
-      - gex
+      - wsl_net
   adminapi:
     build:
       context: ../../
@@ -58,7 +58,7 @@ services:
     ports: # 映射端口
       - "20015:20015"
     networks:
-      - gex
+      - wsl_net
   orderapi:
     build:
       context: ../../
@@ -69,7 +69,7 @@ services:
     ports: # 映射端口
       - "20013:20013"
     networks:
-      - gex
+      - wsl_net
   orderrpc:
     build:
       context: ../../
@@ -80,7 +80,7 @@ services:
     ports: # 映射端口
       - "20001:20001"
     networks:
-      - gex
+      - wsl_net
   quoteapi:
     build:
       context: ../../
@@ -91,7 +91,7 @@ services:
     ports: # 映射端口
       - "20011:20011"
     networks:
-      - gex
+      - wsl_net
   klinerpc:
     build:
       context: ../../
@@ -102,7 +102,7 @@ services:
     ports: # 映射端口
       - "20009:20009"
     networks:
-      - gex
+      - wsl_net
 networks:
-  gex:
+  wsl_net:
     external: true

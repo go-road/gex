@@ -30,7 +30,7 @@ services:
       timeout: 5s
       retries: 10          
     networks:
-      - gex
+      - wsl_net
   #/deploy/depend/pulsar/conf 是相对docker-compose.yaml文件的位置的。
   pulsar_manager:
     image: registry.cn-hangzhou.aliyuncs.com/zhengqing/pulsar-manager:v0.2.0
@@ -55,7 +55,7 @@ services:
       # CLASSPATH: "/pulsar-manager/pulsar-manager/lib/*:/pulsar-manager/pulsar-manager/lib/mysql-connector-j-8.0.33.jar"
       SPRING_CONFIGURATION_FILE: /pulsar-manager/pulsar-manager/application.properties
     networks:
-      - gex
+      - wsl_net
   nginx:
     image: registry.cn-hangzhou.aliyuncs.com/zhengqing/nginx:1.21.1           # 镜像`nginx:1.21.1`
     container_name: nginx               # 容器名为'nginx'
@@ -71,7 +71,7 @@ services:
     ports: # 映射端口
       - "80:80"
     networks:
-      - gex
+      - wsl_net
   mysql:
     image: registry.cn-hangzhou.aliyuncs.com/zhengqing/mysql:8.0  # 原镜像`mysql:8.0`
     container_name: mysql8                                    # 容器名为'mysql8'
@@ -88,7 +88,7 @@ services:
     ports: # 映射端口
       - "3307:3307"
     networks:
-      - gex
+      - wsl_net
   redis:
     image: registry.cn-hangzhou.aliyuncs.com/zhengqing/redis:7.0.5                    # 镜像'redis:7.0.5'
     container_name: redis                                                             # 容器名为'redis'
@@ -104,7 +104,7 @@ services:
     ports: # 映射端口
       - "6379:6379"
     networks:
-      - gex
+      - wsl_net
   etcd:
     image: quay.io/coreos/etcd:v3.5.7                #https://etcd.io/docs/v2.3/docker_guide/
     container_name: etcd
@@ -114,7 +114,7 @@ services:
       - "2379:2379"
       - "2380:2380"
     networks:
-      - gex
+      - wsl_net
   wsproxy:
     build:
       dockerfile: ./ws/proxy/Dockerfile
@@ -127,7 +127,7 @@ services:
     volumes: # 数据卷挂载路径设置,将本机目录映射到容器目录
       - "./ws/proxy/config-deploy.toml:/app/config.toml"
     networks:
-      - gex
+      - wsl_net
   wssocket:
     build:
       dockerfile: ./ws/socket/Dockerfile
@@ -141,7 +141,7 @@ services:
     depends_on:
       - etcd      
     networks:
-      - gex
+      - wsl_net
   dtm:
     build:
       dockerfile: ./dtm/Dockerfile
@@ -155,7 +155,7 @@ services:
     volumes: # 数据卷挂载路径设置,将本机目录映射到容器目录
       - "./dtm/conf.yml:/app/conf.yml"
     networks:
-      - gex
+      - wsl_net
   jaeger:
     image: jaegertracing/all-in-one:1.53
     container_name: jaeger
@@ -184,11 +184,11 @@ services:
       - "9411:9411"      # Zipkin 端口
       # - "6831:6831/udp"  # Agent UDP端口      
     networks:
-      # - gex
-      gex:
+      # - wsl_net
+      wsl_net:
         aliases:
           - otlp-collector  # 添加网络别名      
 networks:
-  gex:
-    name: gex
+  wsl_net:
+    name: wsl_net
     external: true

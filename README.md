@@ -1,3 +1,134 @@
+# 开发常用命令
+
+## 启动和停止基础设施容器和应用容器(全容器运行)
+```bash
+make run
+make stop
+```
+
+## 启动基础设施容器
+```bash
+make run-infra
+```
+
+## 启动和停止本地服务(使用本地配置文件)
+```bash
+make run-local
+make stop-local
+```
+
+## 启动和停止本地服务(使用vscode终端)
+```ini
+/git/gex/.vscode/launch.json
+/git/gex/.vscode/tasks.json
+```
+### 启动所有服务
+先打开项目，然后点击`Terminal` -> `Run Task...`，选择`start all services`，即可启动本地所有服务。
+### 启动单个服务
+如果要单独启动某个服务，点击`Terminal` -> `Run Task...`，选择`<service_name>`然后回车，即可启动单个服务。
+### 停止所有服务
+停止服务同理，点击`Terminal` -> `Run Task...`，选择`Stop Local Services`，即可停止本地所有服务。
+### 开发调试单个服务(推荐)
+如果要单独开发调试某个服务，点击`Run and Debug...` ，选择`Debug <service_name>`然后点击`Start Debugging (F5)`，即可调试单个服务。
+
+## 启动和停止应用容器
+```bash
+docker compose -f deploy/dockerfiles/docker-compose.yaml up -d
+docker compose -f deploy/dockerfiles/docker-compose.yaml down
+```
+
+## 单独启动和停止RocketMQ
+```bash
+docker compose up -d rocketmq_dashboard rocketmq_broker rocketmq_server
+docker compose down rocketmq_dashboard rocketmq_broker rocketmq_server
+```
+
+## 测试
+```bash
+go test -v app/match/rpc/internal/engine/match_engine_test.go
+cd /git/gex/app/match/rpc/internal/engine
+go test -v match_engine_test.go
+go test -v -run TestMatchLimitBuyOrder match_engine_test.go
+```
+
+## 查询进程
+```bash
+ps aux | grep "[g]o-build"
+ps aux | grep "[g]o run app"
+ps aux | grep "[g]o run app" | awk '{print $2}' 
+ps aux | grep "[g]o run app/account/rpc/account.go" 
+ps aux | grep "[g]o run app/account/rpc/account.go" | awk '{print $2}' | xargs -I {} tail -f /proc/{}/fd/1 &
+pgrep -fl "/tmp/go-build.*exe/account"
+pgrep -fl "/tmp/go-build.*exe/order"
+```
+
+## 查询端口
+```bash
+netstat -tulnp | grep -E '2379|6650'
+
+# 验证etcd服务可达性
+telnet etcd 2379
+telnet 172.23.0.1 2379
+
+# 验证pulsar服务可达性
+telnet pulsar 6650
+telnet 172.23.0.1 6650
+
+docker inspect etcd | grep HostPort
+```
+
+## 查询etcd服务
+```bash
+# 验证服务健康状态
+docker exec etcd etcdctl endpoint health
+docker exec -it etcd etcdctl endpoint health --endpoints=127.0.0.1:2379
+docker exec -it etcd etcdctl endpoint health --endpoints=172.23.0.1:2379
+docker exec -it etcd etcdctl endpoint health --endpoints=etcd:2379
+# 验证容器内监听状态
+docker exec etcd netstat -tuln | grep 2379
+# 查看容器日志
+docker logs etcd
+```
+
+## 验证etcd服务注册的完整流程
+```bash
+# 1. 进入etcd容器查询所有注册服务
+docker exec -it etcd etcdctl get --prefix ""
+
+# 2. 强制重新注册proxy服务
+docker restart ws_proxy
+
+# 3. 检查proxy服务容器状态
+docker ps | grep -E 'proxy|ws'
+
+# 4. 观察proxy服务日志
+docker logs -f ws_proxy | grep -i 'register'
+
+# 5. 再次检查etcd注册信息
+docker exec etcd etcdctl get --prefix proxy
+# 输出解读
+proxy/112476027738170693  # 服务注册的完整路径（Key）
+172.24.0.4:10067          # 服务实例的实际地址（Value）
+
+# 6. 检查容器网络连通性
+docker exec -it ws_proxy ping 172.24.0.4
+
+# 7. 验证端口可达性（在宿主机执行）
+telnet 172.24.0.4 10067
+
+# 8. 查看容器端口映射
+docker inspect ws_proxy | grep -A 5 Ports
+
+```
+
+
+## 查询容器网络
+```bash
+docker network ls
+docker network inspect wsl_net
+docker network inspect bridge
+```
+
 # Go命令
 ```bash
 #  查看依赖
@@ -511,7 +642,14 @@ http://api.gex.com/
 ``` bash
 # 创建外部网络
 # 容器内网络：容器间通过Docker DNS自动解析容器名称
+docker network create wsl_net
 docker network create gex
+
+# 删除网络
+docker network rm gex
+
+# 查看网络
+docker network ls
 
 # 构建ws_socket镜像
 chmod +x deploy/depend/ws/socket/socket

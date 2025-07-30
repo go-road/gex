@@ -119,7 +119,7 @@
             "problemMatcher": []
         },
         {
-            "label": "Stop Services",
+            "label": "Stop Local Services",
             "type": "shell", 
             "command": "make stop-local",
             "problemMatcher": []
