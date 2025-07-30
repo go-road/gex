@@ -64,7 +64,23 @@ pgrep -fl "/tmp/go-build.*exe/order"
 
 ## 查询端口
 ```bash
+# netstat用于显示网络连接、路由表、接口统计等信息。参数-tulnp中，-t表示TCP，-u表示UDP，-l表示监听中的端口，-n表示以数字形式显示地址和端口，-p显示进程信息。
+# 这个命令是查看所有TCP和UDP的监听端口，并过滤出指定端口的进程。
 netstat -tulnp | grep -E '2379|6650'
+
+# Docker-proxy是Docker网络的一部分，当Docker容器需要映射主机端口时，Docker会使用docker-proxy进程来处理网络流量。例如，如果容器内部运行的服务使用80端口，而用户将其映射到主机的8080端口，Docker会创建docker-proxy来转发流量。docker-proxy是Docker用于端口转发的组件，如果看到这个进程说明有Docker容器正在使用主机的某个端口。
+# Docker-proxy是Docker的网络代理进程，主要用于：
+# 1.端口映射 - 当Docker容器通过-p 8080:80这类参数运行时，Docker会创建docker-proxy进程来处理宿主机与容器之间的网络流量转发
+# 2.工作原理 - 该进程监听宿主机的指定端口（此处是8080），并将接收到的网络请求转发到对应容器的内部端口
+# 3.进程特征：
+# 进程名固定为docker-proxy
+# 通常会有多个docker-proxy进程（每个端口映射对应一个）
+# 父进程是dockerd（Docker守护进程）
+
+# 查看所有容器的端口映射情况
+docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}"
+# 或者过滤8080端口
+docker ps --filter "publish=8080"
 
 # 验证etcd服务可达性
 telnet etcd 2379
