@@ -36,18 +36,18 @@ LoggerConfig:
 
 AdminGormConf:
   ip: mysql8
-  port: 3307
+  port: 3306
   dbName: admin
   username: root
-  password: root
+  password: daydayup666
   maxIdleConns: 10
   maxOpenConns: 100
 MatchGormConf:
   ip: mysql8
-  port: 3307
+  port: 3306
   dbName: trade
   username: root
-  password: root
+  password: daydayup666
   maxIdleConns: 10
   maxOpenConns: 100
 LanguageEtcdConf:

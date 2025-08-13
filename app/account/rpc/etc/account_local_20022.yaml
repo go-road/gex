@@ -26,10 +26,10 @@ SymbolEtcdConfig:
 
 GormConf:
   ip: mysql8
-  port: 3307
+  port: 3306
   dbName: trade
   username: root
-  password: root
+  password: daydayup666
   maxIdleConns: 10
   maxOpenConns: 100
 LoggerConfig:
@@ -64,6 +64,7 @@ PulsarConfig:
     - pulsar:6650
 RedisConf:
   Host: redis:6379
+  Pass: daydayup666
   Type: node
   PingTimeout: 5s
 

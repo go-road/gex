@@ -653,20 +653,29 @@ http://api.gex.com/
 ```
 
 # 后端环境部署
-## 启动基础设施
-通过 Docker 容器启动etcd、mysql、redis、pulsar等基础设施
+## 创建网络
 ``` bash
 # 创建外部网络
 # 容器内网络：容器间通过Docker DNS自动解析容器名称
 docker network create wsl_net
-docker network create gex
 
 # 删除网络
-docker network rm gex
+docker network rm wsl_net
 
 # 查看网络
 docker network ls
+```
+Docker 重装后，wsl_net 网络的网关地址通常会改变。
+wsl_net 是自定义网络，其网关 IP 是 Docker 在网络创建时从默认子网网段内自动分配的。Docker 默认按顺序从合适的空闲网段选取地址，重装 Docker 会清除原有网络配置，重新安装后再次构建自定义网络时，其会重新分配网关 IP，大概率与之前不同。比如，重装前是 172.23.0.1，重装后变为了 172.18.0.1。
+若希望保持固定网关地址，可在创建网络时用 --subnet 和 --gateway 参数手动指定网段及网关地址，比如：
+```bash
+docker network create --subnet=172.23.0.0/16 --gateway=172.23.0.1 wsl_net
+```
+这样指定后，只要指定的网段未被占用，wsl_net 的网关便会固定为 172.23.0.1。
 
+## 启动基础设施
+通过 Docker 容器启动etcd、mysql、redis、pulsar等基础设施
+``` bash
 # 构建ws_socket镜像
 chmod +x deploy/depend/ws/socket/socket
 docker compose -f deploy/depend/docker-compose.yaml build wssocket
@@ -695,11 +704,11 @@ docker exec -it nginx ping adminapi
 # 测试容器间通信（在容器内执行）
 docker exec accountrpc ping etcd  # 应能解析容器IP
 
-# 验证所有服务是否都在同一个Docker网络（gex）中
-docker network inspect gex
+# 验证所有服务是否都在同一个Docker网络（wsl_net）中
+docker network inspect wsl_net
 
-# 检查jaeger服务是否在gex网络中
-docker network inspect gex | grep jaeger 
+# 检查jaeger服务是否在wsl_net网络中
+docker network inspect wsl_net | grep jaeger 
 
 # 检查某个容器是否正在运行
 docker ps | grep adminapi
@@ -731,9 +740,9 @@ docker compose -f deploy/dockerfiles/docker-compose.yaml up -d
 方法二：使用127.0.0.1 + 映射到宿主机的端口（需要配置docker-compose端口映射）
 ```bash
 # 一般输出结果为：172.23.0.1
-docker network inspect gex --format='{{range .IPAM.Config}}{{.Gateway}}{{end}}'
+docker network inspect wsl_net --format='{{range .IPAM.Config}}{{.Gateway}}{{end}}'
 # 一般输出结果为："Gateway": "172.23.0.1"
-docker network inspect gex | grep Gateway
+docker network inspect wsl_net | grep Gateway
 ```
 ### 2.修改本地服务配置
 `account_local_20024.yaml`
@@ -756,7 +765,7 @@ telnet 172.23.0.1 8080
 telnet 172.23.0.1 6379
 
 # 测试mysql连接  输入exit或quit退出
-mysql -h 172.23.0.1 -P 3307 -uroot -proot
+mysql -h 172.23.0.1 -P 3306 -uroot -proot
 ```
 ## 方案二：配置调整-修改hosts文件（推荐）
 这种方案的优点是：
@@ -788,7 +797,7 @@ curl http://etcd:2379/version
 curl http://etcd:2379/health
 
 # 测试mysql连接
-mysql -h mysql8 -P 3307 -uroot -proot
+mysql -h mysql8 -P 3306 -uroot -proot
 
 # 测试redis连接
 redis-cli -h redis -p 6379
