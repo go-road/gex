@@ -1,4 +1,4 @@
-.idea
+#.idea
 
 admin_template
 deploy/depend/mysql/data
@@ -8,3 +8,6 @@ deploy/depend/redis/data
 **/bin
 deploy/depend/nginx/html/dist
 deploy/depend/pulsar_manager/lib/pulsar-manager.jar
+
+# windows可执行文件
+/app/account/rpc/account_rpc.exe

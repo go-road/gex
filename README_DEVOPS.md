@@ -147,6 +147,13 @@ docker network inspect bridge
 
 # Go命令
 ```bash
+# 查看当前go版本
+go version
+
+# go 环境变量
+go env
+go env GOPROXY
+
 #  查看依赖
 go list -m github.com/zeromicro/go-zero
 
@@ -157,8 +164,12 @@ go clean -modcache
 go mod tidy
 go mod verify
 
-# 查看当前go版本
-go version
+# 编译
+go build -x
+go build -o app/account/rpc/account.go
+
+# 运行
+go run app/account/rpc/account.go -f app/account/rpc/etc/account_local_20022.yaml
 
 # 查看go.mod中的框架版本
 grep go-zero go.mod

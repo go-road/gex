@@ -1,0 +1,30 @@
+### GET request to example server
+GET https://examples.http-client.intellij.net/get
+    ?generated-in=GoLand
+
+### github登录
+POST https://api.github.com/login/oauth/access_token
+Content-Type: application/json
+{
+  "client_id": "{{client_id}}",
+  "client_secret": "{{client_secret}}",
+  "code": "{{code}}"
+}
+
+
+### gex登录
+# curl -X POST http://localhost:20024/account/v1/login
+#  -H "Content-Type: application/json"
+#  -d '{"username":"lisi","password":"lisilisi","captcha":"885778","captcha_id":"BsDmxQSZoghXeyaybOD8"}'
+POST http://localhost:20024/account/v1/login
+Content-Type: application/json
+
+{
+  "username": "lisi",
+  "password": "lisilisi",
+  "captcha": "885778",
+  "captcha_id": "BsDmxQSZoghXeyaybOD8"
+}
+
+###
+
