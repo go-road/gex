@@ -22,7 +22,7 @@
             "request": "launch",
             "mode": "debug",
             "program": "app/account/rpc/account.go",
-            "args": ["-f", "/git/gex/app/account/rpc/etc/account_local_20012.yaml"], 
+            "args": ["-f", "/git/gex/app/account/rpc/etc/account_local_20022.yaml"], 
             "env": {
                 "OTEL_LOG_LEVEL": "debug"
             }
